@@ -116,7 +116,52 @@ pong
 机器人有 80% 概率回复“不叫”，有 20% 概率回复“叫！！！”并发送
 `faces/dagoujiao.jpg`。
 
-## 8. 最近 CS2 比赛
+## 8. 集卡系统
+
+每天每位用户有 5 次抽卡机会。在群里发送：
+
+```text
+抽卡
+```
+
+抽卡会按稀有、史诗、神话、传奇四种品质进行概率抽取，并分阶段发送过程消息，
+最后发送卡片图片。发送：
+
+```text
+查看库存
+```
+
+可以查看当前用户拥有的卡牌数量。卡片名称和图片的对应关系分别保存在
+`rare_card/cards.json`、`epic_card/cards.json`、`myth_card/cards.json` 和
+`legend_card/cards.json` 中。
+
+限定卡牌记录保存在 `limited_card/cards.json` 中。限定卡牌不参与普通抽卡，
+并且在查看库存时显示在所有普通卡牌之后。目前记录的限定卡牌为“猜对概率的奖励奶龙”。
+
+管理员可以在 Python 中调用 `card_system.add_draws_to_all()`，给所有已经产生过
+集卡记录的用户各增加 5 次抽卡机会。也可以传入其他增加次数，例如：
+
+在项目根目录 `F:\qqchatbot` 下执行：
+
+```powershell
+Set-Location .\qqchatbot
+python -c "from card_system import add_draws_to_all; print(add_draws_to_all(5))"
+```
+
+也可以进入 Python 交互环境后调用：
+
+```powershell
+Set-Location .\qqchatbot
+python
+```
+
+```python
+from card_system import add_draws_to_all
+
+add_draws_to_all(5)
+```
+
+## 9. 最近 CS2 比赛
 
 在群里发送：
 

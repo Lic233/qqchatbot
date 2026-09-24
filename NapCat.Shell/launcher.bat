@@ -14,6 +14,12 @@ set NAPCAT_LOAD_PATH=%cd%\loadNapCat.js
 set NAPCAT_INJECT_PATH=%cd%\NapCatWinBootHook.dll
 set NAPCAT_LAUNCHER_PATH=%cd%\NapCatWinBootMain.exe
 set NAPCAT_MAIN_PATH=%cd%\napcat.mjs
+if exist "%cd%\account-login.env" (
+    for /f "usebackq eol=; tokens=1,* delims==" %%a in ("%cd%\account-login.env") do (
+        if "%%a"=="NAPCAT_QUICK_ACCOUNT" set "NAPCAT_QUICK_ACCOUNT=%%b"
+        if "%%a"=="NAPCAT_QUICK_PASSWORD" set "NAPCAT_QUICK_PASSWORD=%%b"
+    )
+)
 :loop_read
 for /f "tokens=2*" %%a in ('reg query "HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\QQ" /v "UninstallString"') do (
     set "RetString=%%~b"

@@ -5,6 +5,7 @@ import time
 
 from cs_matches import get_cs_matches
 from attendance import record_attendance
+from card_system import draw_card, show_inventory
 from config import FACE_RULES, IMAGE_RULES, TEXT_RULES
 from media import (
     save_custom_face, save_diaotu, send_custom_face, send_diaotu,
@@ -71,10 +72,13 @@ def on_message(ws, message):
         return
     group_id, user_id = event.get("group_id"), event.get("user_id")
     raw = str(event.get("raw_message", "")).strip()
+    sender = event.get("sender") or {}
+    username = sender.get("card") or sender.get("nickname") or str(user_id)
     named_save = raw[len("保存吊图"):].strip() if raw.startswith("保存吊图") and raw != "保存吊图" else None
     named_send = raw[len("发送吊图"):].strip() if raw.startswith("发送吊图") and raw != "发送吊图" else None
     _image_segments(event, group_id)
-    handled = (raw in {"大狗叫不叫", "大份比赛", "打卡", "变猫娘", "保存吊图", "发送吊图", "保存"}
+    handled = (raw in {"大狗叫不叫", "大份比赛", "打卡", "变猫娘", "保存吊图", "发送吊图", "保存",
+                       "抽卡", "查看库存"}
                or named_save is not None or named_send is not None or raw in TEXT_RULES
                or raw in FACE_RULES or any(k in raw for k in IMAGE_RULES))
     if raw in TEXT_RULES:
@@ -94,6 +98,10 @@ def on_message(ws, message):
         send_custom_face(ws, group_id, "zayu.jpg")
     if raw == "变猫娘":
         request_catgirl(ws, group_id)
+    if raw == "抽卡":
+        draw_card(ws, group_id, user_id, username)
+    if raw == "查看库存":
+        show_inventory(ws, group_id, user_id, username)
     if named_save is not None or raw == "保存吊图":
         name = named_save
         if name is not None and not is_valid_diaotu_name(name):
@@ -114,8 +122,8 @@ def on_message(ws, message):
         if named_send is not None and not is_valid_diaotu_name(named_send):
             send_group_message(ws, group_id, "吊图名称不能为空，且不能包含文件路径中的特殊字符")
         elif named_send is not None:
-            send_group_message(ws, group_id, "诶～就这张？让我翻翻看……哦～找到了呀，喏，拿去拿去～❤️")
-            send_named_diaotu(ws, group_id, named_send)
+            if send_named_diaotu(ws, group_id, named_send):
+                send_group_message(ws, group_id, "诶～就这张？让我翻翻看……哦～找到了呀，喏，拿去拿去～❤️")
         else:
             send_group_message(ws, group_id, "啧……真麻烦啊。喏，就给你这一张，别得寸进尺了。")
             send_diaotu(ws, group_id)
