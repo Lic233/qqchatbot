@@ -6,12 +6,22 @@ import time
 from cs_matches import get_cs_matches
 from attendance import record_attendance
 from card_system import draw_card, show_inventory
-from config import FACE_RULES, IMAGE_RULES, TEXT_RULES
+from config import BOT_QQ, DEBUG_MESSAGES, FACE_RULES, IMAGE_RULES, TEXT_RULES
+from ai_chat import ask_deepseek, extract_mention_content
 from media import (
     save_custom_face, save_diaotu, send_custom_face, send_diaotu,
     send_group_message, send_image, send_named_diaotu, is_valid_diaotu_name,
 )
-from state import last_faces, last_images, last_messages, pending_catgirl_requests
+from state import (
+    bot_group_name_requested, bot_group_names, last_faces, last_images,
+    last_messages, pending_bot_name_requests, pending_catgirl_requests,
+)
+
+
+def debug_log(*parts):
+    """调试开关打开时打印排查信息。"""
+    if DEBUG_MESSAGES:
+        print("[调试]", *parts)
 
 
 def request_catgirl(ws, group_id):
@@ -48,6 +58,36 @@ def handle_catgirl_response(ws, event):
     return True
 
 
+def request_bot_group_name(ws, group_id):
+    """问 NapCat 机器人在该群的群名片/昵称，用于识别手打的“@名字”。"""
+    if not BOT_QQ or group_id in bot_group_name_requested:
+        return
+    bot_group_name_requested.add(group_id)
+    echo = f"botname-{group_id}"
+    pending_bot_name_requests[echo] = group_id
+    ws.send(json.dumps({"action": "get_group_member_info", "params": {
+        "group_id": group_id, "user_id": BOT_QQ,
+    }, "echo": echo}, ensure_ascii=False))
+
+
+def handle_bot_name_response(event):
+    group_id = pending_bot_name_requests.pop(str(event.get("echo", "")), None)
+    if group_id is None:
+        return False
+    if event.get("status") != "ok":
+        print(f"[AI] 未取到机器人在群 {group_id} 的名片：", event.get("message"))
+        return True
+    data = event.get("data") or {}
+    names = {
+        str(data.get("card") or "").strip(),
+        str(data.get("nickname") or "").strip(),
+    } - {""}
+    if names:
+        bot_group_names[group_id] = names
+        debug_log(f"机器人群名片 group={group_id} names={sorted(names)}")
+    return True
+
+
 def _image_segments(event, group_id):
     for segment in event.get("message", []):
         if segment.get("type") != "image":
@@ -68,12 +108,41 @@ def on_message(ws, message):
         return
     if handle_catgirl_response(ws, event):
         return
+    if handle_bot_name_response(event):
+        return
+    if DEBUG_MESSAGES and event.get("echo") and event.get("status") != "ok":
+        print("[调试] 接口调用失败：", json.dumps(event, ensure_ascii=False))
     if event.get("post_type") != "message" or event.get("message_type") != "group":
+        if DEBUG_MESSAGES and event.get("post_type") == "message":
+            print("[调试] 非群消息被忽略：", json.dumps(event, ensure_ascii=False))
         return
     group_id, user_id = event.get("group_id"), event.get("user_id")
     raw = str(event.get("raw_message", "")).strip()
     sender = event.get("sender") or {}
     username = sender.get("card") or sender.get("nickname") or str(user_id)
+    mentioned, ai_text = extract_mention_content(
+        event, bot_group_names.get(group_id) or ()
+    )
+    request_bot_group_name(ws, group_id)
+    if DEBUG_MESSAGES:
+        segment_types = [
+            segment.get("type") for segment in event.get("message", [])
+            if isinstance(segment, dict)
+        ]
+        print(f"[调试] group={group_id} user={user_id} mentioned={mentioned} "
+              f"segments={segment_types} ai_text={ai_text!r} raw={raw!r}")
+    if mentioned:
+        debug_log(f"AI 触发：user={user_id} text={ai_text!r}")
+        if not ai_text:
+            send_group_message(ws, group_id, "哼，@我却不说话，是在逗我玩吗？")
+        else:
+            try:
+                send_group_message(ws, group_id, ask_deepseek(ai_text))
+            except RuntimeError as error:
+                print(f"[AI] {error}")
+                send_group_message(ws, group_id, "呜……AI暂时走丢了，等我一会儿再试嘛！")
+        last_messages[group_id] = raw
+        return
     named_save = raw[len("保存吊图"):].strip() if raw.startswith("保存吊图") and raw != "保存吊图" else None
     named_send = raw[len("发送吊图"):].strip() if raw.startswith("发送吊图") and raw != "发送吊图" else None
     _image_segments(event, group_id)
@@ -139,6 +208,8 @@ def on_message(ws, message):
         if keyword in raw:
             send_image(ws, group_id, filename)
             break
+    if not handled:
+        debug_log("未命中任何处理：", json.dumps(event, ensure_ascii=False)[:2000])
     if not handled and raw and raw == last_messages.get(group_id):
         send_group_message(ws, group_id, raw)
     last_messages[group_id] = raw

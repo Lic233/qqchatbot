@@ -21,10 +21,49 @@ NapCat WebUI -> 网络配置 -> WebSocket服务器
 
 如果你设置了 Token，请把 `config.py` 里的 `TOKEN = ""` 改成你的 Token。
 
+## 3.1 AI 对话
+
+在 `qqchatbot` 目录下建两个文本文件，文件里只填内容，不要加引号或其他文字：
+
+```text
+qqchatbot/deepseek_api.txt   -> 只填写 DeepSeek API key
+qqchatbot/bot_qq.txt         -> 只填写机器人的 QQ 号
+```
+
+机器人启动时会直接读取这两个文件；文件不存在或为空时，再读取同名环境变量
+（`DEEPSEEK_API_KEY`、`NAPCAT_BOT_QQ`）作为兜底：
+
+```powershell
+$env:DEEPSEEK_API_KEY = "你的 DeepSeek API key"
+$env:NAPCAT_BOT_QQ = "机器人的 QQ 号"
+python bot.py
+```
+
+在群里 `@机器人` 并发送文字后，机器人会用傲娇小萝莉风格调用
+DeepSeek 回复。默认接口是 `https://api.deepseek.com/chat/completions`，
+默认模型是 `deepseek-chat`，可以分别用 `DEEPSEEK_API_URL`、`DEEPSEEK_MODEL`
+环境变量覆盖。如果 API key 无效或请求失败，控制台会打印
+`[AI] DeepSeek 请求失败：...`，群里会提示“AI暂时走丢了”。
+
+`@机器人` 时只发图片、表情或语音也可以：机器人会把它们写成 `[图片]`、`[表情]`、
+`[语音]` 之类的占位符交给 AI 回应。DeepSeek 的文本模型看不到图片内容，所以提示词里
+要求 AI 不要编造图片里的东西。
+
+如果对方是手打“@机器人名字”而 QQ 没有把它转成真正的 @，机器人也能识别：它在第一次收到
+某个群的消息时会向 NapCat 查询自己在该群的群名片和昵称，之后消息里出现 `@该名字` 就按
+@ 机器人处理（这次查询完成前收到的那一条可能漏掉）。
+
+`deepseek_api.txt` 已加入 `.gitignore`，不要把真实的 API key 提交到仓库。
+
+如果发现机器人对某些消息没有反应，可以把 `config.py` 里的 `DEBUG_MESSAGES` 改成
+`True` 再重启：控制台会打印每条群消息的判定结果（是否检测到 @、消息段类型、文字内容）、
+未命中任何处理的消息原始 JSON，以及发送失败的接口调用。排查完记得改回 `False`。
+
 代码按职责拆分为多个模块：
 
 - `bot.py`：WebSocket 连接和程序入口
 - `handlers.py`：群消息解析与命令分发
+- `ai_chat.py`：@机器人时调用 DeepSeek AI
 - `media.py`：图片、表情和吊图的保存与发送
 - `attendance.py`：签到记录
 - `config.py`：路径、规则和连接配置
