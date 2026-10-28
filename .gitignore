@@ -1,0 +1,33 @@
+# ---------------------------------------------------------------
+# 本仓库只放代码和文案模板，以下内容一律不入库
+# ---------------------------------------------------------------
+
+# 凭据 / 私有配置（AppID、Secret、API Key、B站 Cookie）
+config/appid.txt
+config/secret.txt
+config/deepseek_api.txt
+config/search_api.txt
+config/bilibili_cookie.txt
+config/bilibili_cookie.txt.bak
+config/bilibili_sessdata.txt
+config/*.local.txt
+
+# 运行时数据：吊图、老婆图、卡池角色、库存、签到、运势、群友画像、榜单
+data/*
+!data/.gitkeep
+
+# 日志与本地备份
+logs/
+backup/
+
+# 工具产物 / 编辑器缓存
+.preview/
+.workbuddy/
+__pycache__/
+*.py[cod]
+*.log
+
+# 系统垃圾文件
+Thumbs.db
+desktop.ini
+.DS_Store
