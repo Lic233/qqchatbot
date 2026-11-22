@@ -1,7 +1,7 @@
 """把「查看库存」画成一张图（Pillow）。
 
 从原插件 `checkin_card.render_inventory_card` 的版式里搬了骨架：淡紫渐变底、
-白色圆角卡、顶部头像 + 标题、按档位分组的网格、底部奶龙碎片。做了两处简化：
+白色圆角卡、顶部头像 + 标题、按档位分组的网格、底部银币。做了两处简化：
 
 * 尺寸写死一套，不再做 2100px + SCALE 的等比放大（群里看 1600px 已经够清楚）；
 * 不再画背景照片，只用渐变 —— 库存是查资料，不需要氛围图。
@@ -210,12 +210,12 @@ def render_inventory_card(
             )
         y += rows_per_group[index] * (TILE_H + GAP) + 12
 
-    # ---- 底部：奶龙碎片
+    # ---- 底部：银币
     shards_box = (MARGIN, height - MARGIN - FOOTER_H - SHARDS_H,
                   WIDTH - MARGIN, height - MARGIN - FOOTER_H)
     _panel(draw, shards_box)
     draw.text(
-        (MARGIN + PAD + 6, shards_box[1] + 34), "奶龙碎片",
+        (MARGIN + PAD + 6, shards_box[1] + 34), "银币",
         font=_font(26), fill=TEXT_SUB,
     )
     draw.text(
@@ -224,7 +224,7 @@ def render_inventory_card(
     )
     draw.text(
         (WIDTH - MARGIN - PAD, shards_box[1] + SHARDS_H / 2),
-        "重复卡会折成碎片，攒够 500 就能开箱。",
+        "重复卡会折成银币，攒够 500 就能开箱。",
         font=_font(22), fill=TEXT_FAINT, anchor="rm",
     )
 
@@ -280,7 +280,7 @@ def render_checkin_card(
     out_dir,
     today=None,
 ):
-    """画签到图：左边今日老婆，右边抽卡结果 + 奶龙碎片 + 今日运势。"""
+    """画签到图：左边今日老婆，右边抽卡结果 + 银币 + 今日运势。"""
     today = today or datetime.date.today()
     name = (username or "群友").strip()
     drawn = drawn or []
@@ -336,7 +336,7 @@ def render_checkin_card(
     )
     draw.text(
         (WIDTH - MARGIN - PAD, MARGIN + HEADER_H / 2),
-        "奶龙碎片 +" + ("%d（首次）" % shard_gain if first_check_in else "0"),
+        "银币 +" + ("%d（首次）" % shard_gain if first_check_in else "0"),
         font=_font(26, bold=True), fill=ACCENT, anchor="rm",
     )
 
@@ -403,7 +403,7 @@ def render_checkin_card(
     shards_box = (right_left, shards_top, WIDTH - MARGIN, shards_top + shards_h)
     _panel(draw, shards_box)
     draw.text(
-        (right_left + PAD, shards_top + 26), "奶龙碎片",
+        (right_left + PAD, shards_top + 26), "银币",
         font=_font(24), fill=TEXT_SUB,
     )
     draw.text(

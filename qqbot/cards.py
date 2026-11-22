@@ -43,21 +43,25 @@ CARD_BADGE_FALLBACK = (150, 142, 158)
 # 硬保底：连续 14 抽没神话，第 15 抽必出；连续 29 抽没传奇，第 30 抽必出。
 CARD_MYTH_PITY = 15
 CARD_LEGEND_PITY = 30
-# 重复卡折算成奶龙碎片（库存不叠加）。
+# 重复卡折算成银币（库存不叠加）。
 CARD_DUPLICATE_SHARDS = {"rare": 10, "epic": 20, "myth": 150, "legend": 500}
-# 开箱：500 碎片一次，5% 始源卡 / 20% 附魔书 / 75% 碎片（100-300）。
+# 开箱：500 银币一次，10% 始源卡 / 90% 银币（100-300）。
+# 2026-11-19 起附魔书不再从箱子里出（新锻造系统没有附魔书了），这一档给始源卡。
 CARD_BOX_COST = 500
-CARD_BOX_CARD_PROBABILITY = 0.05
-CARD_BOX_BOOK_PROBABILITY = 0.20
+CARD_BOX_CARD_PROBABILITY = 0.10
+# 附魔书已经不在奖池里了（0 就是"开不出来"）。常量留着只给旧锻造的代码引用，
+# 别再用它算概率 —— 奖池就是「10% 始源卡 / 其余银币」。
+CARD_BOX_BOOK_PROBABILITY = 0.0
 CARD_BOX_SHARDS = (100, 300)
 CARD_BOX_TEN_COUNT = 10
-ENCHANT_BOOKS = ("经验修补", "重构", "时运", "升格", "保护", "掠夺")
+# 旧锻造系统的附魔书（入口已关，书也开不出来了；留着是为了库存显示和旧代码）。
+ENCHANT_BOOKS = ("经验修补", "重构", "锋利", "治愈", "时运", "最后一舞")
 # 固定命令：任何时候都认（和原插件的「查看库存」等一致）
 CARD_COMMANDS = ("抽卡", "开箱", "十连开箱", "查看库存", "查看全部库存")
 # 今日猫娘 / 随机老婆（都发 data/wife 里的图）
 WIFE_COMMANDS = ("随机猫娘", "今日猫娘", "随机老婆")
 DRAWS_PER_DAY = 5
-# 签到奖励：每天第一次 200-400 碎片
+# 签到奖励：每天第一次 200-400 银币
 CARD_CHECK_IN_SHARDS = (200, 400)
 
 
@@ -71,7 +75,7 @@ class Cards:
     """抽卡 / 开箱 / 库存，数据落在 data/card_users.json。
 
     和原插件一样按**用户**记账（官方这边键是 member_openid，和 NapCat 那边的
-    QQ 号互不干扰）。重复卡不叠加，一律折成奶龙碎片。
+    QQ 号互不干扰）。重复卡不叠加，一律折成银币。
     """
 
     def __init__(self, data_dir: Path, filename: str = "card_users_official.json") -> None:
@@ -230,7 +234,7 @@ class Cards:
         if int(record["inventory"].get(name, 0)) > 0:
             amount = CARD_DUPLICATE_SHARDS.get(rarity, 0)
             record["shards"] = int(record["shards"]) + amount
-            line = f"又是「{name}」……重复的，我给你折成奶龙碎片 +{amount}。"
+            line = f"又是「{name}」……重复的，我给你折成银币 +{amount}。"
         else:
             record["inventory"][name] = 1
             line = f"抽到了！{CARD_LABELS[rarity]}「{name}」——收好了，别弄丢。"
@@ -261,7 +265,7 @@ class Cards:
         return drawn
 
     def grant_check_in_shards(self, user_id: str) -> int | None:
-        """每天第一次签到给 200-400 碎片；当天第二次返回 None。"""
+        """每天第一次签到给 200-400 银币；当天第二次返回 None。"""
         record = self.user(user_id)
         today = datetime.date.today().isoformat()
         if record.get("last_check_in") == today:
@@ -273,14 +277,14 @@ class Cards:
         self._save()
         return amount
 
-    # ---- 碎片 / 附魔书（锻造用） ----
+    # ---- 银币 / 附魔书（锻造用） ----
 
     def shards_of(self, user_id: str) -> int:
-        """这个人现在有多少奶龙碎片。"""
+        """这个人现在有多少银币。"""
         return int(self.user(user_id)["shards"])
 
     def spend_shards(self, user_id: str, amount: int) -> int | None:
-        """扣碎片；不够返回 None（一分不扣），够就返回扣完还剩多少。"""
+        """扣银币；不够返回 None（一分不扣），够就返回扣完还剩多少。"""
         record = self.user(user_id)
         shards = int(record["shards"])
         if shards < amount:
@@ -303,7 +307,7 @@ class Cards:
         return paid, int(record["shards"])
 
     def grant_shards(self, user_id: str, amount: int) -> int:
-        """发碎片，返回发完的总数。"""
+        """发银币，返回发完的总数。"""
         record = self.user(user_id)
         record["shards"] = int(record["shards"]) + max(0, int(amount))
         self._save()
@@ -339,10 +343,11 @@ class Cards:
     # ---- 开箱 ----
 
     def _roll_box(self, record: dict) -> dict:
+        """开一个箱子：10% 始源卡，其余 90% 出银币（附魔书已经不在奖池里了）。"""
         pool = self._pools.get("origin") or []
         roll = random.random()
         if roll < CARD_BOX_CARD_PROBABILITY and pool:
-            # 完全随机抽一张始源卡：抽到已有的就按重复卡折碎片（不再优先没出过的）。
+            # 完全随机抽一张始源卡：抽到已有的就按重复卡折银币（不再优先没出过的）。
             name, image = random.choice(pool)
             if int(record["inventory"].get(name, 0)) <= 0:
                 record["inventory"][name] = 1
@@ -350,11 +355,6 @@ class Cards:
             amount = random.randint(*CARD_BOX_SHARDS)
             record["shards"] = int(record["shards"]) + amount
             return {"kind": "duplicate", "name": name, "amount": amount}
-        if roll < CARD_BOX_CARD_PROBABILITY + CARD_BOX_BOOK_PROBABILITY and ENCHANT_BOOKS:
-            book = random.choice(ENCHANT_BOOKS)
-            books = record.setdefault("books", {})
-            books[book] = int(books.get(book, 0)) + 1
-            return {"kind": "book", "name": book}
         amount = random.randint(*CARD_BOX_SHARDS)
         record["shards"] = int(record["shards"]) + amount
         return {"kind": "shards", "amount": amount}
@@ -366,11 +366,9 @@ class Cards:
             return f"开出来一张始源卡「{result['name']}」！运气不错嘛。"
         if kind == "duplicate":
             return (
-                f"又是「{result['name']}」……这张你有了，折成奶龙碎片 +{result['amount']}。"
+                f"又是「{result['name']}」……这张你有了，折成银币 +{result['amount']}。"
             )
-        if kind == "book":
-            return f"开出一本附魔书「{result['name']}」，锻造的时候能贴上。"
-        return f"开出一堆奶龙碎片，+{result['amount']}。"
+        return f"开出一堆银币，+{result['amount']}。"
 
     def open_box(self, user_id: str) -> CardReply:
         record = self.user(user_id)
@@ -378,14 +376,14 @@ class Cards:
         if shards < CARD_BOX_COST:
             self._save()
             return CardReply(
-                f"开箱子要 {CARD_BOX_COST} 奶龙碎片，你手里只有 {shards}。"
+                f"开箱子要 {CARD_BOX_COST} 银币，你手里只有 {shards}。"
                 "先去抽卡攒点重复卡吧，我可不做无本买卖。"
             )
         record["shards"] = shards - CARD_BOX_COST
         result = self._roll_box(record)
         left = int(record["shards"])
         self._save()
-        return CardReply(f"{self._describe_box(result)}\n奶龙碎片余额 {left}。", result.get("image"))
+        return CardReply(f"{self._describe_box(result)}\n银币余额 {left}。", result.get("image"))
 
     def open_ten(self, user_id: str) -> CardReply:
         record = self.user(user_id)
@@ -394,31 +392,25 @@ class Cards:
         if shards < cost:
             self._save()
             return CardReply(
-                f"十连开箱要 {cost} 奶龙碎片，你手里只有 {shards}。"
-                "先去多抽几次卡攒碎片吧，别在这儿耍赖。"
+                f"十连开箱要 {cost} 银币，你手里只有 {shards}。"
+                "先去多抽几次卡攒银币吧，别在这儿耍赖。"
             )
         record["shards"] = shards - cost
         results = [self._roll_box(record) for _ in range(CARD_BOX_TEN_COUNT)]
         cards = [item["name"] for item in results if item["kind"] == "card"]
         duplicates = [item["name"] for item in results if item["kind"] == "duplicate"]
-        books: dict[str, int] = {}
-        for item in results:
-            if item["kind"] == "book":
-                books[item["name"]] = books.get(item["name"], 0) + 1
         gained = sum(item.get("amount", 0) for item in results
                      if item["kind"] in {"duplicate", "shards"})
         left = int(record["shards"])
         self._save()
 
-        lines = [f"十个箱子开完了（花了 {cost} 碎片）："]
+        lines = [f"十个箱子开完了（花了 {cost} 银币）："]
         if cards:
             lines.append("始源卡：" + "、".join(cards))
         if duplicates:
-            lines.append("重复折碎片：" + "、".join(duplicates))
-        if books:
-            lines.append("附魔书：" + "、".join(f"{name}×{count}" for name, count in books.items()))
-        lines.append(f"碎片回收 +{gained}")
-        lines.append(f"奶龙碎片余额 {left}。")
+            lines.append("重复折成银币：" + "、".join(duplicates))
+        lines.append(f"银币回收 +{gained}")
+        lines.append(f"银币余额 {left}。")
         image = next((item["image"] for item in results if item["kind"] == "card"), None)
         return CardReply("\n".join(lines), image)
 
@@ -427,7 +419,7 @@ class Cards:
     def inventory_groups(
         self, user_id: str, show_all: bool = False
     ) -> tuple[list[tuple[str, tuple[int, int, int], list[str]]], int, int, int]:
-        """整理库存：返回 (分组, 碎片, 卡总数, 被隐藏的种数)。
+        """整理库存：返回 (分组, 银币, 卡总数, 被隐藏的种数)。
 
         分组是 ``[(档位名, 徽章色, [卡名…]), …]``，空的档位不出现；
         附魔书单独一组排在最后。限定卡两种视图都列（不是抽卡出的，攒到了就该看见）。
@@ -477,12 +469,12 @@ class Cards:
             self._save()
             return (
                 "嗯……空的？你这是……出门忘带东西了？行吧行吧，先去弄点东西回来。"
-                f"小鲸鱼在这儿等你，别等太久～\n奶龙碎片   *{shards}"
+                f"小鲸鱼在这儿等你，别等太久～\n银币   *{shards}"
             )
         groups, shards, total, hidden = self.inventory_groups(user_id, show_all=show_all)
         lines = [f"{label}：" + "、".join(names) for label, _, names in groups]
         if hidden and not show_all:
             lines.append(f"（另有 {hidden} 种稀有/史诗没列出来，想看就发「查看全部库存」）")
-        lines.append(f"共 {total} 张卡，奶龙碎片 *{shards}")
+        lines.append(f"共 {total} 张卡，银币 *{shards}")
         self._save()
         return "\n".join(lines)

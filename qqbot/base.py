@@ -210,6 +210,62 @@ class Incoming:
     has_card: bool = False
     # 卡片里带的「B站视频标题」（只有手机端小程序卡片才有）。有它就按标题搜。
     card_title: str = ""
+    # 来自按钮点击（INTERACTION_CREATE）时，这里是互动事件 id。
+    # 回复要用它当 event_id，不能当 msg_id 用。
+    event_id: str = ""
+
+
+# 按钮点击的回复锚点：把互动事件 id 包成 ``event:<id>`` 塞进 msg_id。
+# 这样 Handler 里所有 ``sender.xxx(..., event.msg_id)`` 都不用改，发送层认前缀。
+EVENT_TOKEN_PREFIX = "event:"
+
+# INTERACTION_CREATE 的 type=11：消息里的按钮被点击。
+INTERACTION_TYPE_BUTTON = 11
+
+
+def event_reply_token(interaction_id: str) -> str:
+    """互动事件 id → 可塞进 msg_id 的回复锚点。"""
+    return f"{EVENT_TOKEN_PREFIX}{interaction_id}" if interaction_id else ""
+
+
+def split_reply_token(token: str) -> tuple[str, str]:
+    """回复锚点 → ``("event"|"msg", id)``。"""
+    token = token or ""
+    if token.startswith(EVENT_TOKEN_PREFIX):
+        return "event", token[len(EVENT_TOKEN_PREFIX):]
+    return "msg", token
+
+
+def parse_interaction_event(d: dict) -> "Incoming | None":
+    """把 INTERACTION_CREATE（按钮点击）转成 Incoming，交给原来的命令分发。
+
+    关键设计：按钮的 ``action.data`` 就写**和文本命令一模一样**的字符串
+    （点「签到」等于发「签到」），所以 handler 里那套命令路由一行都不用改，
+    面板只是换了个入口，不是第二套业务逻辑。
+
+    事件体里没有昵称，只有 ``group_member_openid``；昵称要用 Roster 反查（可选）。
+    """
+    try:
+        if int(d.get("type") or 0) != INTERACTION_TYPE_BUTTON:
+            return None
+    except (TypeError, ValueError):
+        return None
+    resolved = (d.get("data") or {}).get("resolved") or {}
+    command = str(resolved.get("button_data") or "").strip()
+    if not command:
+        return None
+    interaction_id = str(d.get("id") or "")
+    return Incoming(
+        group_openid=str(d.get("group_openid") or ""),
+        user_openid=str(d.get("group_member_openid") or d.get("user_openid") or ""),
+        content=normalize_content(command),
+        msg_id=event_reply_token(interaction_id),
+        event_id=interaction_id,
+        event_type="INTERACTION_CREATE",
+        # 按钮本来就是"主动点我"，不需要 @ 判定；置 False 以免未命中的按钮
+        # 掉进 AI 闲聊分支。
+        mentioned=False,
+    )
 
 
 # 官方消息正文里可能带 @ 标记；命令匹配前要清掉。
@@ -505,6 +561,7 @@ def build_system_prompt(
     context: str = "",
     vision_enabled: bool = False,
     search_enabled: bool = False,
+    pet_state: str = "",
 ) -> str:
     """拼这一次请求的系统提示词。
 
@@ -564,6 +621,13 @@ def build_system_prompt(
         parts.append(block)
     if context:
         parts.append(f"【你们最近的对话】\n{context}")
+    if pet_state:
+        # 只当背景用。写清楚"别主动提"，否则模型会把它当新玩具反复表演。
+        parts.append(
+            f"【你手头正在做的事】{pet_state}\n"
+            "这只是你此刻的状态，不是话题：不要主动提起、不要反复强调、"
+            "不要拿它演人设或卖惨。对方问起你在忙什么，顺口带一句就够了。"
+        )
     return "\n".join(parts)
 
 

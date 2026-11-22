@@ -230,12 +230,21 @@ class Roster:
         self._last_save = 0.0
 
     def remember(self, group: str, user: str, name: str) -> None:
-        if not group or not user:
+        # 按钮点击的事件里没有昵称（只有 group_member_openid），别拿空字符串
+        # 把已经记下来的名字冲掉。
+        if not group or not user or not (name or "").strip():
             return
         members = self.records.setdefault(group, {})
         if members.get(user) != name:
             members[user] = name
             self._dirty = True
+
+    def name_of(self, group: str, user: str) -> str:
+        """这个人的群名片；没见过就返回空串。
+
+        按钮点击的事件里没有昵称（只有 group_member_openid），只能从这里反查。
+        """
+        return (self.records.get(group) or {}).get(str(user), "")
 
     def save(self, force: bool = False) -> None:
         """攒够 5 秒或强制时才落盘，免得每条消息都写一遍。"""
@@ -313,9 +322,9 @@ LUCK_FLAVOR = {
     "大凶": "别出门了，真的。",
 }
 LUCK_ADVICE = {
-    "大吉": ("抽卡、开箱、表白", "跟小鲸鱼顶嘴"),
-    "中吉": ("抽卡、攒碎片", "熬夜"),
-    "小吉": ("抽卡", "乱花碎片"),
+    "大吉": ("抽卡、开箱、表白", "跟本小姐顶嘴"),
+    "中吉": ("抽卡、攒银币", "熬夜"),
+    "小吉": ("抽卡", "乱花银币"),
     "吉": ("签到、聊天", "想太多"),
     "末吉": ("先攒着", "冲动开箱"),
     "凶": ("安静待着", "抽卡"),

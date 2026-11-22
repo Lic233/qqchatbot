@@ -14,8 +14,12 @@ from .config import *  # noqa: F401,F403
 from .cs import *  # noqa: F401,F403
 from .features import *  # noqa: F401,F403
 from .forge import *  # noqa: F401,F403
+from .forge_new import *  # noqa: F401,F403
 from .forge_rank import *  # noqa: F401,F403
 from .handler import *  # noqa: F401,F403
+from .panel import *  # noqa: F401,F403
+from .pet import *  # noqa: F401,F403
+from .voice import *  # noqa: F401,F403
 
 
 # --------------------------------------------------------------------------
@@ -27,9 +31,21 @@ PNG_1PX = base64.b64decode(
 )
 
 
+def _raises(call, error_type) -> bool:
+    """跑一下 call，看是不是抛了指定异常（自检里不想为每条都写 try 块）。"""
+    try:
+        call()
+    except error_type:
+        return True
+    except Exception:  # noqa: BLE001 - 抛别的类型也算不符合预期
+        return False
+    return False
+
+
 class FakeSender:
     def __init__(self) -> None:
         self.events: list[tuple[str, str]] = []
+        self.panels: list[list[dict]] = []     # 每次发面板时的按钮行
 
     async def text(self, group: str, content: str, msg_id: str | None = None) -> None:
         # 和真正的 GroupSender 一样过千分位，否则自检看不出区别
@@ -38,9 +54,17 @@ class FakeSender:
     async def image(self, group: str, path: Path, msg_id: str | None = None) -> None:
         self.events.append(("image", Path(path).name))
 
+    async def voice(self, group: str, path: Path, msg_id: str | None = None) -> None:
+        self.events.append(("voice", Path(path).name))
+
     async def markdown(self, group: str, content: str,
                        msg_id: str | None = None) -> None:
         self.events.append(("markdown", content))
+
+    async def panel(self, group: str, content: str, rows: list[dict],
+                    msg_id: str | None = None) -> None:
+        self.panels.append(rows)
+        self.events.append(("panel", content))
 
     async def text_long(self, group: str, content: str,
                         msg_id: str | None = None) -> None:
@@ -57,6 +81,8 @@ async def selftest() -> int:
         (paths.images, "wocaishinailong.jpg"),
         (paths.images, "qixiaole.jpg"),
         (paths.images, "zhemeqiang.jpg"),
+        (paths.images, "eat.gif"),
+        (paths.images, "play.gif"),
     ):
         (directory / filename).write_bytes(PNG_1PX)
 
@@ -69,6 +95,20 @@ async def selftest() -> int:
     persona_file.write_text("你是测试人设，说话简短。", encoding="utf-8")
     handler = Handler(sender, paths, persona_path=persona_file)
     failures: list[str] = []
+
+    # AI 短回复默认会自带一条语音条。自检不联网，也不该真去开 edge/PowerShell，
+    # 所以全局把合成换成假的（「== 语音 ==」那节自己会临时换成另一个假的）。
+    from . import handler as handler_module
+
+    ai_voices: list[str] = []
+
+    async def fake_synthesize(text, **kwargs):
+        ai_voices.append(text)
+        out = temporary / "stub-voice.wav"
+        out.write_bytes(b"RIFF" + b"\x00" * 1024)
+        return out
+
+    handler_module.synthesize = fake_synthesize
 
     async def feed(content: str, images: list[ImageRef] | None = None,
                    is_bot: bool = False, msg_id: str = "m1",
@@ -181,8 +221,11 @@ async def selftest() -> int:
     handler.chat = fake_chat
     sender.events.clear()
     ai_calls.clear()
+    ai_voices.clear()
     await feed("你好呀", mentioned=True)
-    expect("@ 触发 AI", sender.events == [("text", "收到：你好呀")])
+    expect("@ 触发 AI", sender.events == [("text", "收到：你好呀"),
+                                        ("voice", "stub-voice.wav")])
+    expect("短回复才念、念的是回复原文", ai_voices == ["收到：你好呀"])
     expect("提示词带人设", bool(ai_calls) and "测试人设" in ai_calls[0][0])
     expect("提示词带说话人", bool(ai_calls) and "「测试」" in ai_calls[0][0])
     expect("没开搜索时提示词说没联网", bool(ai_calls) and "没有联网工具" in ai_calls[0][0])
@@ -221,9 +264,12 @@ async def selftest() -> int:
         return "第一段。" * 400
 
     handler.chat = long_chat
+    ai_voices.clear()
     await feed("讲个长故事", mentioned=True, msg_id="m6")
     expect("长回复切成多条", len(sender.events) > 1)
     expect("每条都没超限", all(len(text) <= REPLY_CHUNK_CHARS for _, text in sender.events))
+    expect("长回复不念语音",
+           all(kind == "text" for kind, _ in sender.events) and not ai_voices)
 
     # AI 失败要兜底，不能把异常抛出去
     sender.events.clear()
@@ -449,6 +495,14 @@ async def selftest() -> int:
     await feed("看看这个", mentioned=True, msg_id="v3")
     expect("用了群里最近的链接", video_calls == ["https://b23.tv/zzz999"])
 
+    # 反过来也要防：群里留着链接时，别人聊别的话题顺嘴说了句「总结」，不该被
+    # 劫持去总结那个旧视频（23:09 实测真发生过，还回了句「这个链接我没认出来」）。
+    sender.events.clear()
+    ai_calls.clear()
+    video_calls.clear()
+    await feed("和原神的优点对比一下，总结哪个更好玩", mentioned=True, msg_id="v3b")
+    expect("聊别的顺嘴说总结不抢戏", not video_calls and bool(ai_calls))
+
     # 太长的直接拒绝，别把上下文顶爆
     class LongBili:
         def analyze(self, link):
@@ -537,6 +591,18 @@ async def selftest() -> int:
         "title": "某某", "qqdocurl": "https://m.q.qq.com/a/s/zzz"}}},
         ensure_ascii=False)
     expect("别的小程序不误判", find_link_in_raw(other) == "")
+    # 实测踩过的坑：一条普通文字消息，事件里某个随机串凑出「BV + 10 位」，被当
+    # 成视频链接存了 10 分钟，接着别人问「总结」直接被劫持，报 code=-400。
+    noise = json.dumps({
+        "id": "m1", "content": "这个确实没办法",
+        "preview": "https://qq.ugcimg.cn/v1/BVqQDrsNYAeD/x.jpg",
+    }, ensure_ascii=False)
+    expect("没有 B站 痕迹时不认裸 BV 号", find_link_in_raw(noise) == "")
+    expect(
+        "有 B站 痕迹的裸 BV 号仍然认",
+        find_link_in_raw(json.dumps({"title": "哔哩哔哩", "v": "BV1GJ411x7h7"},
+                                    ensure_ascii=False)) == "BV1GJ411x7h7",
+    )
     expect(
         "QQ 自己套的 url.cn 短链也能认",
         find_link_in_raw(json.dumps({"title": "哔哩哔哩", "u": "https://url.cn/AbCd123"},
@@ -783,6 +849,36 @@ async def selftest() -> int:
     ))
     expect("@ 自己时触发 AI", bool(sender.events) and sender.events[0][0] == "text")
 
+    # 宠物状态：只在真的在忙时进提示词，而且写清楚"别主动提"
+    pet_u1 = handler.pets.get("U1")
+    pet_u1["action"] = "写代码"
+    pet_u1["action_start"] = int(time.time()) - 3600
+    hint = handler._pet_state_hint("G1", "U1")
+    expect("在打工时给出状态提示", "写代码" in hint and "1 小时" in hint)
+    pet_u1["action"] = "发呆"
+    expect("发呆时不打扰模型", handler._pet_state_hint("G1", "U1") == "")
+    expect("没养宠物就不掺和", handler._pet_state_hint("G1", "查无此人") == "")
+
+    pet_u1["action"] = "玩耍"
+    pet_u1["play_kind"] = "CS"
+    pet_u1["action_start"] = int(time.time()) - 1200
+    play_hint = handler._pet_state_hint("G1", "U1")
+    expect("AI 知道在玩什么", "CS" in play_hint and "玩耍" in play_hint)
+
+    pet_u1["action"] = "写代码"
+    pet_u1["action_start"] = int(time.time())
+    ai_calls.clear()
+    sender.events.clear()
+    await handler.handle(Incoming(
+        group_openid="G1", user_openid="U1", username="测试",
+        content="在干嘛", msg_id="m82", mentioned=True, mention_ids=["BOT-ID"],
+    ))
+    system_now = ai_calls[-1][0] if ai_calls else ""
+    expect("系统提示词里带上了手头的事",
+           "你手头正在做的事" in system_now and "写代码" in system_now)
+    expect("提示词明确要求别主动提",
+           "不要主动提起" in system_now)
+
     print("== 千分位 ==")
     expect("六位以上切三位", format_numbers("现在价值 1234567") == "现在价值 1,234,567")
     expect("刚好六位才切", format_numbers("123456") == "123,456")
@@ -793,18 +889,29 @@ async def selftest() -> int:
     class FakeAPI:
         def __init__(self) -> None:
             self.texts: list[str] = []
+            self.calls: list[tuple[str, str]] = []   # (msg_id, event_id)
 
         async def send_text(self, group: str, content: str,
-                            msg_id: str | None = None, msg_seq: int = 1) -> dict:
+                            msg_id: str | None = None, msg_seq: int = 1,
+                            event_id: str = "") -> dict:
             self.texts.append(content)
+            self.calls.append((msg_id or "", event_id))
             return {"id": "x"}
 
         async def send_image(self, *args, **kwargs) -> dict:
             return {"id": "y"}
 
     fake_api = FakeAPI()
-    await GroupSender(fake_api).text("G1", "碎片 1234567")
-    expect("出群文本自动千分位", fake_api.texts == ["碎片 1,234,567"])
+    await GroupSender(fake_api).text("G1", "银币 1234567")
+    expect("出群文本自动千分位", fake_api.texts == ["银币 1,234,567"])
+
+    fake_api.calls.clear()
+    await GroupSender(fake_api).text("G1", "普通回复", "ROBOT1.0_x")
+    expect("普通消息用 msg_id 回", fake_api.calls == [("ROBOT1.0_x", "")])
+
+    fake_api.calls.clear()
+    await GroupSender(fake_api).text("G1", "按钮回复", event_reply_token("inter-9"))
+    expect("按钮点击改用 event_id 回", fake_api.calls == [("", "inter-9")])
 
     print("== 抽卡 / 开箱 ==")
     for rarity, folder, card in (
@@ -848,25 +955,25 @@ async def selftest() -> int:
     expect("次数减一", int(record["draws"]) == DRAWS_PER_DAY - 1)
     expect("库存记了一张", sum(int(v) for v in record["inventory"].values()) == 1)
 
-    # 单一卡池里再抽一定重复 → 折碎片
+    # 单一卡池里再抽一定重复 → 折银币
     while int(cards.user("U-CARD")["draws"]) > 0:
         cards.draw("U-CARD")
-    expect("重复卡折成碎片", int(cards.user("U-CARD")["shards"]) > 0)
+    expect("重复卡折成银币", int(cards.user("U-CARD")["shards"]) > 0)
     expect("次数用完有提示", "明天" in cards.draw("U-CARD").text)
 
-    # 开箱：碎片不足
+    # 开箱：银币不足
     poor = cards.user("U-POOR")
     poor["shards"] = 10
-    expect("碎片不够开箱", "要 500" in cards.open_box("U-POOR").text)
+    expect("银币不够开箱", "要 500" in cards.open_box("U-POOR").text)
 
     # 开箱：扣 500 并给结果
     rich = cards.user("U-RICH")
     rich["shards"] = CARD_BOX_COST
     box = cards.open_box("U-RICH")
-    expect("开箱有结果", any(word in box.text for word in ("始源卡", "附魔书", "碎片")))
+    expect("开箱有结果", any(word in box.text for word in ("始源卡", "银币")))
     expect("开箱扣了 500", int(cards.user("U-RICH")["shards"]) < CARD_BOX_COST)
 
-    # 始源卡改为完全随机：抽到已有的就折碎片，不再优先没出过的。
+    # 始源卡改为完全随机：抽到已有的就折银币，不再优先没出过的。
     from . import cards as cards_module
 
     class _StubBoxRandom:
@@ -904,6 +1011,32 @@ async def selftest() -> int:
         and fresh_record["inventory"].get("已有始源") == 1,
     )
 
+    # 2026-11-19 起：奖池只剩「10% 始源卡 / 90% 银币」，附魔书不再出
+    expect("始源卡概率改成 10%", abs(CARD_BOX_CARD_PROBABILITY - 0.10) < 1e-9)
+
+    class _MidBoxRandom:
+        @staticmethod
+        def random():
+            return 0.5
+
+        @staticmethod
+        def randint(low, high):
+            return 100
+
+    saved_mid_random = cards_module.random
+    cards_module.random = _MidBoxRandom()
+    try:
+        plain_record = {"inventory": {}, "shards": 0, "books": {}}
+        plain_roll = cards._roll_box(plain_record)
+    finally:
+        cards_module.random = saved_mid_random
+    expect(
+        "10% 以外只出银币、附魔书已经开不出来",
+        plain_roll["kind"] == "shards"
+        and plain_roll["amount"] == 100
+        and plain_record["books"] == {},
+    )
+
     # 十连：要 5000
     ten = cards.user("U-TEN")
     ten["shards"] = CARD_BOX_COST * CARD_BOX_TEN_COUNT
@@ -914,7 +1047,7 @@ async def selftest() -> int:
     # 库存文案
     inventory = cards.inventory_text("U-CARD")
     expect("库存列了卡", "稀有" in inventory or "史诗" in inventory or "神话" in inventory)
-    expect("库存报碎片", "奶龙碎片" in inventory)
+    expect("库存报银币", "银币" in inventory)
 
     # 限定卡：精选和全部两种库存都要列出（包括只有名字没有图的）
     limited = cards.user("U-LIMITED")
@@ -998,18 +1131,20 @@ async def selftest() -> int:
     else:
         expect("签到发的是文字", bool(sender.events) and sender.events[0][0] == "text")
     record = handler.cards.user("U1")
-    expect("签到给碎片", int(record["shards"]) > before)
+    expect("签到给银币", int(record["shards"]) > before)
     expect("签到用完次数", int(record["draws"]) == 0)
     expect(
         "记住今天签过",
         record.get("last_check_in") == datetime.date.today().isoformat(),
     )
-    expect("当天第二次不给碎片", handler.cards.grant_check_in_shards("U1") is None)
+    expect("当天第二次不给银币", handler.cards.grant_check_in_shards("U1") is None)
 
     print("== 今日猫娘 / 随机老婆 ==")
     sender.events.clear()
     await feed("随便说句话", msg_id="m40")     # 让名册记住这个人
     expect("名册记住发言人", bool(handler.roster.members("G1")))
+    expect("名册能按 openid 反查名片", handler.roster.name_of("G1", "U1") == "测试")
+    expect("名册查不到时返回空串", handler.roster.name_of("G1", "不存在的人") == "")
     sender.events.clear()
     await feed("随机老婆", msg_id="m41")
     expect("随机老婆发文字", bool(sender.events) and sender.events[0][0] == "text")
@@ -1020,6 +1155,394 @@ async def selftest() -> int:
     expect("今日猫娘带 @ 标记", any("qqbot-at-user" in text for text in bubbles))
     expect("走的是 markdown 卡片", any(kind == "markdown" for kind, _ in sender.events))
     expect("今日猫娘配图", any(kind == "image" for kind, _ in sender.events))
+
+    print("== 按钮面板 ==")
+    rows = build_rows([["喂食", "玩耍", "休息"], ["打工 1h", "打工 4h"]],
+                      highlight=True, user_ids=["U1"])
+    expect("按钮行数不超限", 0 < len(rows) <= MAX_ROWS)
+    expect("每行按钮数不超限",
+           all(len(row.get("buttons") or []) <= MAX_BUTTONS_PER_ROW for row in rows))
+    buttons = [button for row in rows for button in (row.get("buttons") or [])]
+    expect("首行首个按钮高亮", buttons[0]["render_data"]["style"] == 1)
+    expect("其余按钮不高亮", all(b["render_data"]["style"] == 0 for b in buttons[1:]))
+    expect("按钮文字不超过 10 字",
+           all(len(b["render_data"]["label"]) <= MAX_LABEL_CHARS for b in buttons))
+    expect("超长按钮文字被截断",
+           build_rows([["一二三四五六七八九十十一"]])[0]["buttons"][0]
+           ["render_data"]["label"] == "一二三四五六七八九十")
+    expect("超过 5 行被截断", len(build_rows([["签到"]] * 7)) == MAX_ROWS)
+    expect("按钮全部是回调型（群聊只有这种能一键执行）",
+           all(b["action"]["type"] == 1 for b in buttons))
+    expect("按钮 data 就是命令原文", buttons[0]["action"]["data"] == "喂食")
+    expect("面板按钮只签名给唤出者",
+           all(b["action"]["permission"]["type"] == 0
+               and b["action"]["permission"]["specify_user_ids"] == ["U1"]
+               for b in buttons))
+    expect("不签名时所有人都能点",
+           build_rows([["签到"]])[0]["buttons"][0]["action"]["permission"]["type"] == 2)
+
+    sender.events.clear()
+    await feed("按钮测试", msg_id="p1")
+    expect("「按钮测试」发出带按钮的消息",
+           bool(sender.events) and sender.events[0][0] == "panel")
+    sender.events.clear()
+    await feed("按钮测试 回执", msg_id="p2")
+    expect("点「回执」能回话",
+           bool(sender.events) and "回调通了" in sender.events[0][1])
+
+    clicked = parse_interaction_event({
+        "id": "inter-1",
+        "type": 11,
+        "scene": "group",
+        "group_openid": "G1",
+        "group_member_openid": "U1",
+        "data": {"type": 11, "resolved": {"button_data": "签到"}},
+    })
+    expect("按钮点击能还原成命令", clicked is not None and clicked.content == "签到")
+    expect("按钮回复锚点走 event_id",
+           clicked is not None and clicked.event_id == "inter-1"
+           and clicked.msg_id == "event:inter-1")
+    # 平台只认带前缀的写法，裸 uuid 会被判 40034025；前缀在发送层补
+    passive: dict = {}
+    QQBotAPI._attach_passive(passive, event_id="inter-1")
+    expect("event_id 自动补事件类型前缀",
+           passive.get("event_id") == "INTERACTION_CREATE:inter-1")
+    expect("回复锚点能拆回来",
+           split_reply_token("event:abc") == ("event", "abc")
+           and split_reply_token("ROBOT1.0_x") == ("msg", "ROBOT1.0_x"))
+    expect("非按钮互动不处理", parse_interaction_event({"id": "x", "type": 13}) is None)
+
+    sender.events.clear()
+    if clicked is not None:
+        await handler.handle(clicked)
+    expect("按钮点击走的是同一条命令链路", bool(sender.events))
+
+    print("== 宠物 ==")
+    pets = handler.pets
+    base = 1_700_000_000.0
+    record = pets.get("P1", base)
+    expect("新宠物满体力满心情",
+           record["stamina"] == 100 and record["mood"] == 100)
+    pets.switch("P1", "写代码", base)
+    settled = pets.settle("P1", base + 60 * 60)
+    expect("写代码 1 小时结算 3 块", settled["units"] == 3)
+    expect("3 块给 144 银币", settled["coins"] == 144)
+    expect("银币直接进钱包", handler.cards.shards_of("P1") == 144)
+    expect("体力心情各掉 30", record["stamina"] == 70 and record["mood"] == 70)
+    expect("不满 20 分钟的零头不算",
+           pets.settle("P1", base + 60 * 60 + 11 * 60)["units"] == 0)
+
+    record["stamina"] = 15.0
+    pets.switch("P1", "写代码", base + 60 * 60)
+    capped = pets.settle("P1", base + 60 * 60 + 80 * 60)
+    expect("体力只够 1 块就只结算 1 块", capped["units"] == 1)
+    expect("剩下的时间转成发呆",
+           capped["idle_units"] == 3 and record["action"] == "发呆")
+
+    record["exp"] = exp_need(1) - 2
+    record["action"] = "写代码"
+    record["action_start"] = base
+    record["stamina"] = 100
+    record["mood"] = 100
+    up = pets.settle("P1", base + 20 * 60)
+    expect("经验够了就升级", record["level"] == 2 and up["levels"] == 1)
+    expect("30 级前是 20+5×等级",
+           (exp_need(1), exp_need(2), exp_need(29)) == (25, 30, 165))
+    expect("30 级起陡增 400+100×(等级-30)",
+           (exp_need(30), exp_need(31), exp_need(39)) == (400, 500, 1300))
+    expect("等级上限 40", MAX_LEVEL == 40)
+    expect("每 5 级涨上限",
+           (limits(4), limits(5), limits(10), limits(30), limits(40))
+           == ((100, 100), (105, 110), (110, 120), (130, 160), (140, 180)))
+
+    # 发呆：每块回 1 体力 1 心情（不至于软锁）
+    record["stamina"] = 50
+    record["mood"] = 50
+    record["action"] = "发呆"
+    record["action_start"] = base
+    pets.settle("P1", base + 60 * 60)
+    expect("发呆每块回 1 体力 1 心情", record["stamina"] == 53 and record["mood"] == 53)
+
+    # 好感度：干活掉、玩耍回，归零后只能发呆/玩耍
+    record["affection"] = 100
+    record["stamina"] = 100
+    record["mood"] = 100
+    record["action"] = "写代码"
+    record["action_start"] = base
+    pets.settle("P1", base + 60 * 60)
+    expect("工作每块掉 3 好感", record["affection"] == 91)
+
+    record["affection"] = 50
+    record["mood"] = 50
+    record["stamina"] = 100        # 上一段写代码已经耗掉了体力，这里重置，便于算账
+    record["action"] = "玩耍"
+    record["action_start"] = base
+    pets.settle("P1", base + 60 * 60)
+    expect("玩耍每块回 10 好感 5 心情",
+           record["affection"] == 80 and record["mood"] == 65)
+    expect("玩耍每块掉 3 体力", record["stamina"] == 91)
+
+    # 体力 0 时点不动玩耍：它现在也耗体力，否则会白点一下变发呆
+    record["stamina"] = 0
+    record["mood"] = 100
+    record["affection"] = 100
+    record["action"] = "发呆"
+    record["action_start"] = base
+    expect("体力 0 不能玩耍",
+           pets.switch("P1", "玩耍", base).get("reason") == "exhausted")
+    expect("体力 0 还能发呆",
+           pets.switch("P1", "发呆", base).get("ok") is True)
+    record["stamina"] = 100
+
+    # 玩耍挂机也给经验：每块 3 点（3 块 = 9）
+    pexp = pets.get("PEXP")
+    pexp.update({"level": 1, "exp": 0, "stamina": 100, "mood": 100,
+                 "affection": 50, "action": "玩耍", "action_start": base})
+    pets.settle("PEXP", base + 60 * 60)
+    expect("玩耍每 20 分钟给 3 经验", int(pexp["exp"]) == 9)
+
+    # 摸鱼：不扣好感，但银币和经验照给
+    pmoyu = pets.get("PMOYU")
+    pmoyu.update({"level": 15, "exp": 0, "stamina": 100, "mood": 100,
+                  "affection": 50, "action": "摸鱼", "action_start": base})
+    pets.settle("PMOYU", base + 60 * 60)
+    expect("摸鱼不消耗好感", float(pmoyu["affection"]) == 50)
+    expect("摸鱼照给银币和经验",
+           int(pmoyu.get("coins_earned") or 0) == 36 and int(pmoyu["exp"]) == 9)
+
+    # 好感 0 也能接着摸，不会被踢去发呆
+    pmoyu.update({"affection": 0, "action": "摸鱼", "action_start": base})
+    pets.settle("PMOYU", base + 60 * 60)
+    expect("好感 0 也能继续摸鱼", pmoyu["action"] == "摸鱼")
+
+    # 好感 0 时面板上也点得动摸鱼，别的活儿照样拦
+    pmoyu.update({"affection": 0, "stamina": 100, "mood": 100,
+                  "action": "摸鱼", "action_start": base})
+    expect("好感 0 也能点摸鱼", pets.switch("PMOYU", "摸鱼", base).get("ok") is True)
+    pmoyu.update({"affection": 0, "stamina": 100, "mood": 100,
+                  "action": "发呆", "action_start": base})
+    expect("好感 0 还是不能写代码",
+           pets.switch("PMOYU", "写代码", base).get("reason") == "exhausted")
+
+    pets.switch("P1", "发呆", base)
+    pets.switch("P1", "玩耍", base)
+    expect("玩耍会随机一个花样", record.get("play_kind") in PLAY_KINDS)
+    play_status = status_line(pets.snapshot("P1", base + 1200))
+    expect("状态里写明在玩什么", "玩耍中：" in play_status)
+    expect("玩耍状态也是冒号+换行", play_status.count("\n") == 1)
+
+    record["affection"] = 0
+    record["stamina"] = 100
+    record["mood"] = 100
+    blocked = pets.switch("P1", "写代码", base)
+    expect("好感度归零就干不了活", blocked.get("reason") == "exhausted")
+    allowed = pets.switch("P1", "玩耍", base)
+    expect("好感度归零还能玩耍", allowed.get("ok") is True)
+
+    # 睡觉：每块 +5 体力 / +3 心情 / +3 好感，不花任何东西
+    psleep = pets.get("PSLEEP")
+    psleep.update({"level": 1, "stamina": 50, "mood": 50, "affection": 50,
+                   "action": "睡觉", "action_start": base})
+    pets.settle("PSLEEP", base + 60 * 60)          # 3 块
+    expect("睡觉每块回 5 体力 3 心情 3 好感",
+           psleep["stamina"] == 65 and psleep["mood"] == 59
+           and psleep["affection"] == 59)
+
+    # 体力为 0 也能睡（它是回体力的，不该被体力门槛拦）
+    psleep.update({"stamina": 0, "mood": 100, "affection": 100,
+                   "action": "发呆", "action_start": base})
+    expect("体力 0 能睡觉", pets.switch("PSLEEP", "睡觉", base).get("ok") is True)
+    psleep.update({"action": "睡觉", "action_start": int(time.time())})
+    expect("状态写明在睡觉", "睡觉中" in status_line(pets.snapshot("PSLEEP")))
+    expect("面板有睡觉按钮",
+           any(label == "睡觉" for row in handler._pet_main_rows()
+               for label, _ in row))
+
+    # 新解锁：摸鱼 15 级
+    u1_pet = handler.pets.get("U1")
+    u1_pet["level"] = 1
+    sender.events.clear()
+    await feed("宠物 做 摸鱼", msg_id="pet-5")
+    expect("1 级摸不了鱼", any("Lv.15" in text for _, text in sender.events))
+    u1_pet["level"] = 15
+    sender.events.clear()
+    await feed("宠物 做 摸鱼", msg_id="pet-6")
+    expect("15 级能摸鱼", any("摸鱼" in text for _, text in sender.events))
+
+    # 22 级解锁红石电子技术
+    handler.pets.get("U1")["level"] = 21
+    sender.events.clear()
+    await feed("宠物 做 红石电子技术", msg_id="pet-8")
+    expect("21 级上不了红石", any("Lv.22" in text for _, text in sender.events))
+    handler.pets.get("U1")["level"] = 22
+    sender.events.clear()
+    await feed("宠物 做 红石电子技术", msg_id="pet-9")
+    expect("22 级能上红石", any("红石" in text for _, text in sender.events))
+
+    # 黄桃罐头：唯一能哄好感的食物
+    handler.cards.user("U1")["shards"] = 200
+    handler.pets.get("U1")["affection"] = 50
+    handler.pets.get("U1")["stamina"] = 10
+    sender.events.clear()
+    await feed("宠物 吃 黄桃罐头", msg_id="pet-10")
+    expect("黄桃罐头能回好感", handler.pets.get("U1")["affection"] == 55)
+
+    # 吃饭已经 6 样，按钮要能换行
+    sender.events.clear()
+    sender.panels.clear()
+    await feed("宠物 吃饭", msg_id="pet-11")
+    food_rows = sender.panels[0] if sender.panels else []
+    food_datas = [b["action"]["data"] for row in food_rows for b in row["buttons"]
+                  if b["action"]["data"].startswith("宠物 吃")]
+    expect("六样食物都排上了按钮", len(food_datas) == 6)
+    expect("食物按钮分成两行", len(food_rows) == 3)
+    expect("按钮三个一行", all(len(row["buttons"]) <= 3 for row in food_rows))
+
+    sender.events.clear()
+    sender.panels.clear()
+    await feed("宠物面板", msg_id="pet-12")
+    main_rows = sender.panels[0] if sender.panels else []
+    expect("主面板六个按钮排成 3+3",
+           [len(row["buttons"]) for row in main_rows] == [3, 3])
+
+    sender.events.clear()
+    sender.panels.clear()
+    await feed("宠物面板", msg_id="pet-0")
+    expect("宠物面板发出带按钮的消息", bool(sender.panels))
+    expect("宠物面板盖了名字和等级",
+           any("大肥鱼" in text for _, text in sender.events))
+
+    sender.events.clear()
+    sender.panels.clear()
+    await feed("宠物 工作", msg_id="pet-1")
+    expect("工作有二级菜单", bool(sender.panels))
+    labels = [b["render_data"]["label"] for row in sender.panels[0]
+              for b in row["buttons"]]
+    expect("二级菜单列出全部工作",
+           {"写代码", "直播", "摸鱼", "cos大肥鱼", "AI模型研发"} <= set(labels))
+    datas = [b["action"]["data"] for row in sender.panels[0] for b in row["buttons"]]
+    expect("二级按钮的 data 就是命令", "宠物 做 写代码" in datas)
+
+    sender.events.clear()
+    handler.pets.get("U1")["level"] = 1
+    await feed("宠物 做 直播", msg_id="pet-2")
+    expect("等级不够会提示", any("Lv.5" in text for _, text in sender.events))
+
+    handler.cards.user("U1")["shards"] = 0
+    handler.pets.get("U1")["stamina"] = 30
+    sender.events.clear()
+    await feed("宠物 吃 大白饭", msg_id="pet-3")
+    expect("银币不够吃不了", any("银币不够" in text for _, text in sender.events))
+
+    handler.cards.user("U1")["shards"] = 100
+    sender.events.clear()
+    await feed("宠物 吃 大白饭", msg_id="pet-4")
+    expect("吃饭扣银币并回体力", handler.cards.shards_of("U1") == 50)
+    expect("吃饭附带 eat.gif", ("image", "eat.gif") in sender.events)
+
+    sender.events.clear()
+    handler.cards.user("U1")["shards"] = 100
+    handler.pets.get("U1")["mood"] = 10
+    await feed("宠物 吃 joja可乐", msg_id="pet-7")
+    expect("吃别的也发动图", ("image", "eat.gif") in sender.events)
+
+    # 吃饭会结算上一段，并把计时重置到当下
+    u1 = handler.pets.get("U1")
+    mood_cap, stamina_cap = limits(int(u1["level"]))
+    u1["action"] = "写代码"
+    u1["action_start"] = start_ts = int(time.time()) - 3600
+    u1["stamina"] = stamina_cap
+    u1["mood"] = mood_cap
+    handler.cards.user("U1")["shards"] = 200
+    sender.events.clear()
+    sender.panels.clear()
+    await feed("宠物 吃 大白饭", msg_id="pet-13")
+    expect("吃饭结算上一段（144 工钱 - 50 饭钱）",
+           handler.cards.shards_of("U1") == 294)
+    expect("吃饭把计时重置到当下", u1["action_start"] != start_ts)
+    expect("吃饭发吃饭动图", ("image", "eat.gif") in sender.events)
+    bubbles = [text for kind, text in sender.events
+               if kind in ("panel", "text")]
+    expect("吃饭只回一条结果", len(bubbles) == 1 and "吃完了" in bubbles[0])
+    eat_lines = bubbles[0].splitlines() if bubbles else []
+    expect("三行：结算 → 吃饭结果 → 余额",
+           len(eat_lines) == 3 and eat_lines[0].startswith("结算了")
+           and eat_lines[1].startswith("吃完了")
+           and eat_lines[2].startswith("银币余额"))
+    expect("吃完饭不再发按钮面板", sender.panels == [])
+
+    # 玩耍附 play.gif（和 eat.gif 同一套机制），每次点都发
+    u1.update({"stamina": 100, "mood": 100, "affection": 100,
+               "action": "发呆", "action_start": int(time.time())})
+    sender.events.clear()
+    await feed("宠物 玩耍", msg_id="pet-play-1")
+    expect("点玩耍发 play.gif", ("image", "play.gif") in sender.events)
+    sender.events.clear()
+    await feed("宠物 玩耍", msg_id="pet-play-2")
+    expect("重复点玩耍也发动图", ("image", "play.gif") in sender.events)
+
+    # 面板不再合成语音
+    sender.events.clear()
+    await feed("宠物面板", msg_id="pet-panel-novoice")
+    expect("面板不再发语音", not any(kind == "voice" for kind, _ in sender.events))
+    sender.panels.clear()          # 唤出面板本身会发按钮，别弄脏后面的断言
+
+    # 闲着而且三项都满时才拦
+    u1["action"] = "发呆"
+    u1["action_start"] = int(time.time())
+    u1["stamina"] = stamina_cap
+    u1["mood"] = mood_cap
+    sender.events.clear()
+    await feed("宠物 吃 大白饭", msg_id="pet-14")
+    expect("饱着就不吃了", any("吃不下" in text for _, text in sender.events))
+    expect("失败也不发按钮面板", sender.panels == [])
+
+    # 属性低于 10：发消息时顶一句，半小时内不重复
+    u1 = handler.pets.get("U1")
+    u1.update({"stamina": 9, "mood": 100, "affection": 100,
+               "action": "发呆", "action_start": int(time.time()), "warn_at": 0})
+    warning = handler.pets.warn_text("U1")
+    expect("属性低于 10 会顶一句", warning in WARN_POOLS["stamina"])
+    expect("冷却里不重复提醒", handler.pets.warn_text("U1") == "")
+    # 直接把上次提醒时间往前拨，模拟"已经过了半小时"
+    u1["warn_at"] = int(time.time()) - WARN_COOLDOWN - 1
+    expect("过了冷却还能提醒", bool(handler.pets.warn_text("U1")))
+    expect("没养宠物不提醒", handler.pets.warn_text("查无此人") == "")
+    # 阈值边界：严格小于 10，等于 10 不算
+    expect("9 会提醒", bool(low_warning(
+        {"stamina": 9, "mood": 50, "affection": 50})))
+    expect("刚好 10 不提醒", low_warning(
+        {"stamina": 10, "mood": 50, "affection": 50}) == "")
+    expect("11 不提醒", low_warning(
+        {"stamina": 11, "mood": 50, "affection": 50}) == "")
+    expect("0 仍然提醒", bool(low_warning(
+        {"stamina": 0, "mood": 50, "affection": 50})))
+    expect("两项低挑合并池", low_warning(
+        {"stamina": 9, "mood": 5, "affection": 50}) in WARN_POOLS["all"])
+    expect("只有心情低挑心情池", low_warning(
+        {"stamina": 50, "mood": 9, "affection": 50}) in WARN_POOLS["mood"])
+    expect("阈值常量是 10", WARN_THRESHOLD == 10)
+    expect("提示文案池够厚", all(len(pool) >= 6 for pool in WARN_POOLS.values()))
+    expect("提示文案不重复",
+           len(set(sum((list(v) for v in WARN_POOLS.values()), []))) ==
+           sum(len(v) for v in WARN_POOLS.values()))
+    all_warn = sum((list(v) for v in WARN_POOLS.values()), [])
+    expect("提示都在 20 字左右", all(17 <= len(x) <= 24 for x in all_warn))
+    # 调子统一，句式不统一：别又写回清一色「……真的……先…吧」
+    expect("提示句式不雷同",
+           sum(x.endswith("吧。") for x in all_warn) < len(all_warn) // 3
+           and sum("……" in x for x in all_warn) < len(all_warn) // 2
+           and sum("真的" in x for x in all_warn) < len(all_warn) // 4
+           and len({x[:3] for x in all_warn}) >= 20)
+    expect("饿了会惦记大白饭",
+           sum("白饭" in x for x in WARN_POOLS["stamina"]) >= 5)
+
+    u1["warn_at"] = 0
+    sender.events.clear()
+    await feed("随便说句话", msg_id="pet-warn")
+    expect("发消息会触发低属性提醒",
+           any(kind == "text" and text in WARN_POOLS["stamina"]
+               for kind, text in sender.events))
 
     print("== 群友画像 ==")
     profiles = Profiles(temporary)
@@ -1197,10 +1720,16 @@ async def selftest() -> int:
     )
     expect("石剑倍率 1.2~1.4", SWORDS["stone"].factor == (1.2, 1.4))
     expect("钻石剑倍率 1.4~1.6", SWORDS["diamond"].factor == (1.4, 1.6))
-    expect("幸运暴击 2.0~2.5", CRIT_FACTOR == (2.0, 2.5))
+    expect("幸运暴击 1.8~2.3", CRIT_FACTOR == (1.8, 2.3))
     expect(
-        "s1 附魔书就是这六本",
-        BOOK_NAMES == ("经验修补", "重构", "时运", "升格", "保护", "掠夺"),
+        "s2 附魔书就是这六本",
+        BOOK_NAMES == ("经验修补", "重构", "锋利", "治愈", "时运", "最后一舞"),
+    )
+    expect(
+        "s2 下架的 s1 书抽不到也贴不上",
+        parse_book("附魔 升格") is None
+        and parse_book("附魔 保护") is None
+        and parse_book("附魔 掠夺") is None,
     )
     expect(
         "下界合金剑概率恒定 20/50/30",
@@ -1236,7 +1765,7 @@ async def selftest() -> int:
     handler.cards.grant_shards("F1", 1000)
     forged = forge.start("G1", "F1", SWORDS["iron"])
     expect(
-        "铁剑扣 250 碎片",
+        "铁剑扣 250 银币",
         forged["paid"] == 250 and handler.cards.shards_of("F1") == 750,
     )
     forge.clear()
@@ -1244,226 +1773,9 @@ async def selftest() -> int:
     handler.cards.grant_shards("F1", 1000)
     forged = forge.start("G1", "F1", SWORDS["diamond"])
     expect(
-        "钻石剑扣 500 碎片、初始价值 500",
+        "钻石剑扣 500 银币、初始价值 500",
         forged["paid"] == 500 and forged["value"] == 500,
     )
-    forge.clear()
-
-    # 无头骑士剑（限时）：恒定概率、自带修补、开局抽诅咒、收益封顶。
-    # 这一段会真发碎片、真进榜，先把排行榜换成临时的一份，别污染后面的排行榜用例。
-    headless_rank = ForgeRank(paths.data / "forge_rank_headless.json")
-    real_rank = forge.rank
-    forge.rank = headless_rank
-    expect(
-        "无头骑士剑概率恒定 25/45/30",
-        outcome_table("headless", 9) == (0.25, 0.45, 0.30),
-    )
-    expect(
-        "无头骑士剑 1.3~1.5、暴击 15%",
-        SWORDS["headless"].factor == (1.3, 1.5)
-        and SWORDS["headless"].crit_chance == 0.15,
-    )
-    expect(
-        "无头骑士剑可以直接锻造",
-        parse_sword("锻造 无头骑士剑") is SWORDS["headless"],
-    )
-    expect("无头骑士剑默认开放", headless_available())
-    forge.clear()
-    handler.cards.grant_shards("F1", 5000)
-    forged = forge.start("G1", "F1", SWORDS["headless"])
-    session = forge.active("G1", "F1")
-    expect(
-        "无头骑士剑扣 1000、初始价值 1000、完成度 50",
-        forged["paid"] == 1000
-        and forged["value"] == 1000
-        and abs(session.completion - 50) < 1e-9,
-    )
-    expect("开局随机抽到一个诅咒", session.curse in CURSES)
-    expect(
-        "开局播报本场诅咒",
-        f"诅咒【{session.curse}】" in start_text(forged, SWORDS["headless"]),
-    )
-    owned_before = handler.cards.books_of("F1")
-    denied = forge.use_book("G1", "F1", "保护")
-    expect(
-        "无头骑士剑不吃附魔书（书也不扣）",
-        denied["reason"] == "no_enchant"
-        and handler.cards.books_of("F1") == owned_before,
-    )
-    session.curse = CURSE_BACKLASH
-    expect(
-        "诅咒·反噬把暴击率翻四倍",
-        abs(forge.crit_chance(session) - 0.60) < 1e-9,
-    )
-    forge.rng = StubRng([0.30, 0.05, 2.2])
-    crit = forge.strike("G1", "F1")
-    expect(
-        "诅咒·反噬：暴击时完成度 -5",
-        crit.crit and crit.backlash and abs(crit.completion - 45) < 1e-9,
-    )
-    # 永生：倍率照常（1.3~1.5），完成度 +15，顶满就自动收工。
-    forge.clear()
-    handler.cards.grant_shards("F1", 5000)
-    forge.start("G1", "F1", SWORDS["headless"])
-    session = forge.active("G1", "F1")
-    session.curse = CURSE_IMMORTAL
-    session.completion_cap = INITIAL_COMPLETION
-    session.completion = 50.0
-    session.turns = 3
-    forge.rng = StubRng([0.30, 0.99, 1.45])
-    immortal = forge.strike("G1", "F1")
-    expect(
-        "诅咒·永生：倍率照常 1.3~1.5、增加时完成度 +15",
-        1.3 <= immortal.factor <= 1.5
-        and abs(immortal.completion - 65) < 1e-9
-        and forge.active("G1", "F1") is not None,
-    )
-    forge.rng = StubRng([0.95, 0.99])
-    unchanged = forge.strike("G1", "F1")
-    expect(
-        "诅咒·永生：不变时完成度也 +15",
-        unchanged.outcome == "unchanged"
-        and abs(unchanged.completion - 80) < 1e-9,
-    )
-    session.completion = 95.0
-    forge.rng = StubRng([0.30, 0.99, 1.45])
-    immortal_end = forge.strike("G1", "F1")
-    expect(
-        "诅咒·永生：满完成度强制收工",
-        immortal_end.forced_end
-        and forge.active("G1", "F1") is None
-        and "强制收工" in strike_text(immortal_end),
-    )
-    # 失衡：失败不掉完成度，第三次直接报废。
-    forge.clear()
-    handler.cards.grant_shards("F1", 5000)
-    forge.start("G1", "F1", SWORDS["headless"])
-    session = forge.active("G1", "F1")
-    session.curse = CURSE_UNBALANCED
-    forge.rng = StubRng([0.0])
-    first_fail = forge.strike("G1", "F1")
-    expect(
-        "诅咒·失衡：失败不掉完成度",
-        first_fail.failed
-        and first_fail.unbalanced
-        and abs(forge.active("G1", "F1").completion - 50) < 1e-9,
-    )
-    forge.rng = StubRng([0.0])
-    forge.strike("G1", "F1")
-    forge.rng = StubRng([0.0])
-    third_fail = forge.strike("G1", "F1")
-    expect(
-        "诅咒·失衡：失败三次强制失败、局消失",
-        third_fail.forced_fail and forge.active("G1", "F1") is None,
-    )
-    # 收益封顶 50000。
-    forge.clear()
-    handler.cards.grant_shards("F1", 5000)
-    forge.start("G1", "F1", SWORDS["headless"])
-    session = forge.active("G1", "F1")
-    session.value = 1e9
-    session.completion = 100.0
-    session.turns = 3
-    capped = forge.end_forge("G1", "F1")
-    expect(
-        "无头骑士剑收益封顶 50000",
-        capped["capped"] and capped["reward"] == 50000,
-    )
-    # 易碎：完成度上限 70、最终价值 ×1.8。
-    forge.clear()
-    handler.cards.grant_shards("F1", 5000)
-    forge.start("G1", "F1", SWORDS["headless"])
-    session = forge.active("G1", "F1")
-    session.curse = CURSE_BRITTLE
-    session.completion_cap = BRITTLE_COMPLETION_CAP
-    session.value = 1000.0
-    session.completion = BRITTLE_COMPLETION_CAP
-    session.turns = 3
-    brittle = forge.end_forge("G1", "F1")
-    expect(
-        "诅咒·易碎：×1.8 乘在收益上（价值不变）",
-        brittle["brittle"]
-        and brittle["value"] == 1000.0
-        and brittle["reward"]
-        == round(reward_for(1000, 70) * BRITTLE_REWARD_FACTOR),
-    )
-    expect(
-        "易碎进榜记的是 ×1.8 之后的收益",
-        any(
-            item["user_id"] == "F1"
-            and item["value"] == round(reward_for(1000, 70) * BRITTLE_REWARD_FACTOR)
-            for item in headless_rank.leaderboard()
-        ),
-    )
-    reloaded_headless = ForgeRank(paths.data / "forge_rank_headless.json")
-    expect(
-        "易碎倍率落盘后还在（读盘重算也带着 ×1.8）",
-        any(
-            item["value"] == round(reward_for(1000, 70) * BRITTLE_REWARD_FACTOR)
-            for item in reloaded_headless.leaderboard()
-        ),
-    )
-    # 三个新诅咒：鸩毒 / 贪饕 / 畸变。
-    class CurseRng(StubRng):
-        """开局抽诅咒时固定返回指定的那个（StubRng.choice 只会返回第一个）。"""
-
-        def __init__(self, curse, values):
-            super().__init__(values)
-            self._curse = curse
-
-        def choice(self, seq):
-            return self._curse
-
-    forge.clear()
-    handler.cards.grant_shards("F1", 5000)
-    forge.rng = CurseRng(CURSE_POISON, [0.30, 0.99, 1.4])
-    started = forge.start("G1", "F1", SWORDS["headless"])
-    expect(
-        "诅咒·鸩毒：开局完成度拉满 100",
-        started["curse"] == CURSE_POISON and started["completion"] == 100,
-    )
-    forge.rng = StubRng([0.30, 0.99, 1.4])
-    poisoned = forge.strike("G1", "F1")
-    expect(
-        "诅咒·鸩毒：增加不回完成度、每回合固定 -4",
-        abs(poisoned.completion - 96) < 1e-9 and poisoned.poisoned,
-    )
-    forge.rng = StubRng([0.0])
-    poisoned_fail = forge.strike("G1", "F1")
-    expect(
-        "诅咒·鸩毒：失败也不掉完成度、只掉那 4 点",
-        poisoned_fail.failed and abs(poisoned_fail.completion - 92) < 1e-9,
-    )
-    forge.clear()
-    handler.cards.grant_shards("F1", 5000)
-    forge.rng = CurseRng(CURSE_GLUTTONY, [0.30, 0.99])
-    started = forge.start("G1", "F1", SWORDS["headless"])
-    expect("诅咒·贪饕能被抽到", started["curse"] == CURSE_GLUTTONY)
-    forge.rng = StubRng([0.30, 0.99])
-    plain = forge.strike("G1", "F1")
-    expect("诅咒·贪饕：普通增加固定 1.1", plain.factor == GLUTTONY_FACTOR)
-    forge.rng = StubRng([0.30, 0.05])
-    gluttony_crit = forge.strike("G1", "F1")
-    expect(
-        "诅咒·贪饕：暴击固定 10 倍",
-        gluttony_crit.crit and gluttony_crit.factor == GLUTTONY_CRIT_FACTOR,
-    )
-    forge.clear()
-    handler.cards.grant_shards("F1", 5000)
-    forge.rng = CurseRng(CURSE_MUTATION, [0.0, 40])
-    forge.start("G1", "F1", SWORDS["headless"])
-    session = forge.active("G1", "F1")
-    session.value = 1000.0
-    forge.rng = StubRng([0.0, 40])
-    mutated = forge.strike("G1", "F1")
-    expect(
-        "诅咒·畸变：失败价值 ×2、完成度掉 30~50",
-        mutated.mutated
-        and abs(mutated.value - 2000) < 1e-9
-        and abs(mutated.completion - 10) < 1e-9,
-    )
-    forge.rank = real_rank
-    headless_rank.clear()
     forge.clear()
 
     handler.cards.grant_shards("F1", 1000)
@@ -1558,33 +1870,29 @@ async def selftest() -> int:
         and not result.crit,
     )
 
+    # 锋利：本局每次「增加」都吃剑的最大倍率，暴击仍走 1.8~2.3。
     handler.cards.grant_shards("F1", 1000)
     forge.clear()
     forge.start("G1", "F1", SWORDS["stone"])
-    handler.cards.user("F1")["books"] = {"保护": 2}
+    handler.cards.user("F1")["books"] = {"锋利": 1}
     handler.cards._save()
-    armed = forge.use_book("G1", "F1", "保护")
+    expect("贴锋利成功", forge.use_book("G1", "F1", "锋利")["ok"])
+    forge.rng = StubRng([0.5, 0.99])
+    sharp = forge.strike("G1", "F1")
     expect(
-        "贴保护成功、3 回合后才到账",
-        armed["ok"] and armed["books_left"] == 6 and not armed["guard_ready"],
+        "锋利把增加固定成石剑最大倍率 1.4",
+        sharp is not None and abs(sharp.value - 70) < 1e-9 and not sharp.crit,
     )
-    forge.rng = StubRng([0.5, 0.99, 1.2] * 3)
-    for _ in range(3):
-        forge.strike("G1", "F1")
-    expect("保护三回合后到账", forge.active("G1", "F1").guard)
-    forge.rng = StubRng([0.0])
-    result = forge.strike("G1", "F1")
+    forge.rng = StubRng([0.5, 0.02, 2.3])
+    sharp_crit = forge.strike("G1", "F1")
     expect(
-        "保护挡下完成度损失",
-        result is not None
-        and result.guarded
-        and abs(result.completion - 100) < 1e-9
-        and abs(result.value - 86.4) < 1e-9,
+        "锋利不影响暴击倍率（仍 1.8~2.3）",
+        sharp_crit is not None and sharp_crit.crit
+        and abs(sharp_crit.value - 161) < 1e-9,
     )
-    again = forge.use_book("G1", "F1", "保护")
     expect(
-        "保护一局只能一次",
-        again["reason"] == "already" and handler.cards.books_of("F1").get("保护") == 1,
+        "锋利一局只能贴一次",
+        forge.use_book("G1", "F1", "锋利")["reason"] == "already",
     )
     forge.clear()
 
@@ -1663,53 +1971,111 @@ async def selftest() -> int:
     expect("经验修补：不变时 +5 完成度", abs(same.completion - 70) < 1e-9)
     forge.clear()
 
-    # 掠夺：不变也涨价值（1.2~1.4），不暴击。
+    # 治愈：暴击时额外回 15 完成度，一局最多两次。
     handler.cards.grant_shards("F1", 1000)
     forge.start("G1", "F1", SWORDS["stone"])
-    handler.cards.user("F1")["books"] = {"掠夺": 1}
+    handler.cards.user("F1")["books"] = {"治愈": 1}
     handler.cards._save()
-    expect("贴掠夺成功", forge.use_book("G1", "F1", "掠夺")["ok"])
-    forge.rng = StubRng([0.95, 1.2])
-    plundered = forge.strike("G1", "F1")
+    expect("贴治愈成功", forge.use_book("G1", "F1", "治愈")["ok"])
+    forge.active("G1", "F1").completion = 50.0
+    forge.rng = StubRng([0.5, 0.02, 2.2])
+    healed = forge.strike("G1", "F1")
     expect(
-        "掠夺把「不变」变成涨 20%",
-        plundered is not None and plundered.plunder
-        and abs(plundered.value - 60) < 1e-9
-        and abs(plundered.value_before - 50) < 1e-9,
+        "治愈：暴击时基础 +3 之外再 +15",
+        healed is not None and healed.healed and healed.heal_left == 1
+        and abs(healed.completion - 68) < 1e-9,
+    )
+    expect("治愈在回复里有提示", "治愈" in strike_text(healed))
+    forge.rng = StubRng([0.5, 0.02, 2.2])
+    healed2 = forge.strike("G1", "F1")
+    expect(
+        "治愈第二次仍然生效",
+        healed2 is not None and healed2.healed and healed2.heal_left == 0
+        and abs(healed2.completion - 86) < 1e-9,
+    )
+    forge.rng = StubRng([0.5, 0.02, 2.2])
+    healed3 = forge.strike("G1", "F1")
+    expect(
+        "治愈两次用尽后不再回",
+        healed3 is not None and not healed3.healed
+        and abs(healed3.completion - 89) < 1e-9,
     )
     forge.clear()
 
-    # 升格：吃 2 个次数，剑变下界合金剑（1.6~1.8 / 暴击 20% / 失败 20%）。
+    # 最后一舞：立刻 +30，三回合后 -30，那之前收工收益减半。
     handler.cards.grant_shards("F1", 1000)
     forge.start("G1", "F1", SWORDS["stone"])
-    handler.cards.user("F1")["books"] = {"升格": 2}
+    handler.cards.user("F1")["books"] = {"最后一舞": 2}
     handler.cards._save()
-    upgraded = forge.use_book("G1", "F1", "升格")
+    forge.active("G1", "F1").completion = 60.0
+    dance = forge.use_book("G1", "F1", "最后一舞")
     expect(
-        "升格吃 2 个次数、换成下界合金剑",
-        upgraded["ok"] and upgraded["books_left"] == 5
-        and forge.active("G1", "F1").sword == "netherite",
+        "最后一舞立刻 +30 完成度",
+        dance["ok"] and abs(forge.active("G1", "F1").completion - 90) < 1e-9,
     )
-    forge.rng = StubRng([0.3, 0.5, 1.7])
-    hit = forge.strike("G1", "F1")
+    expect("最后一舞贴完说清了代价", "最后一舞" in book_text(dance, "最后一舞"))
     expect(
-        "下界合金剑用 1.6~1.8",
-        hit is not None and abs(hit.value - 85) < 1e-9 and not hit.crit,
+        "最后一舞一局只能贴一次",
+        forge.use_book("G1", "F1", "最后一舞")["reason"] == "already",
     )
+    # 三锤「不变」，第三锤落地时正好到期，完成度从 90 扣回 60。
+    for _ in range(2):
+        forge.rng = StubRng([0.95])
+        forge.strike("G1", "F1")
     expect(
-        "升格不能贴第二次",
-        forge.use_book("G1", "F1", "升格")["reason"] == "already",
+        "最后一舞没到三回合不扣",
+        abs(forge.active("G1", "F1").completion - 90) < 1e-9,
+    )
+    forge.rng = StubRng([0.95])
+    dropped = forge.strike("G1", "F1")
+    expect(
+        "最后一舞三回合到点扣回 30",
+        dropped is not None and dropped.dance_drop
+        and abs(dropped.completion - 60) < 1e-9,
+    )
+    expect("最后一舞扣减有提示", "最后一舞" in strike_text(dropped))
+    forge.clear()
+
+    # 扣回之前收工：收益减半。
+    handler.cards.grant_shards("F1", 1000)
+    forge.start("G1", "F1", SWORDS["stone"])
+    handler.cards.user("F1")["books"] = {"最后一舞": 1}
+    handler.cards._save()
+    for _ in range(3):
+        forge.rng = StubRng([0.95])
+        forge.strike("G1", "F1")
+    forge.use_book("G1", "F1", "最后一舞")
+    dance_end = forge.end_forge("G1", "F1", "最后一舞测试")
+    expect(
+        "三回合内收工收益减半",
+        dance_end["ok"] and dance_end["halved"]
+        and dance_end["reward"] == round(reward_for(50, 100) * LAST_DANCE_PENALTY),
+    )
+    expect("收工回复里写明减半", "最后一舞" in end_text(dance_end))
+    expect(
+        "减半后的收益不会被排行榜按公式算回去",
+        any(
+            item["name"] == "最后一舞测试"
+            and item["value"] == round(reward_for(50, 100) * LAST_DANCE_PENALTY)
+            for item in handler.forge_rank.leaderboard()
+        ),
     )
     forge.clear()
 
     handler.cards.grant_shards("F1", 1000)
     forge.start("G1", "F1", SWORDS["stone"])
     forge.active("G1", "F1").books_used = 6
-    denied = forge.use_book("G1", "F1", "升格")
+    handler.cards.user("F1")["books"] = {"时运": 1}
+    handler.cards._save()
+    denied = forge.use_book("G1", "F1", "时运")
     expect(
-        "升格只剩 1 个次数时拒绝",
-        denied["reason"] == "limit" and denied.get("need") == 2,
+        "只剩 1 个次数时还能再贴一本",
+        denied["ok"] and denied["books_left"] == 0,
     )
+    handler.cards.user("F1")["books"] = {"时运": 1}
+    handler.cards._save()
+    denied = forge.use_book("G1", "F1", "时运")
+    expect("用满 7 次后拒绝并保留书", denied["reason"] == "limit")
     forge.clear()
 
     handler.cards.grant_shards("F1", 1000)
@@ -1719,7 +2085,7 @@ async def selftest() -> int:
         forge.strike("G1", "F1")
     ended = forge.end_forge("G1", "F1", "测试锻造人")
     expect(
-        "收工按收益曲线发碎片",
+        "收工按收益曲线发银币",
         ended["ok"] and ended["reward"] == 86 and ended["completion"] == 100,
     )
     expect("收工记进排行榜", ended["rank"] == 1)
@@ -1805,87 +2171,360 @@ async def selftest() -> int:
         abs(reward_for(1_000_000, 100) - 2 * reward_for(1_000_000, 50)) <= 1,
     )
 
-    print("== 锻造命令 ==")
-    handler.forge.rng = random
+    print("== 新锻造系统（按钮面板） ==")
+    new_forge = handler.forge_new
+    # 前面的卡池测试换过 handler.cards，新锻造还指着旧实例；这里对齐一下。
+    new_forge.cards = handler.cards
+    new_forge.clear()
     handler.checkin_renderer = None
-    handler.cards.grant_shards("U1", 10000)
-    sender.events.clear()
-    await feed("锻造 石剑", msg_id="fg1")
-    expect(
-        "锻造开局有回复",
-        any("石剑" in text for kind, text in sender.events if kind == "text"),
-    )
-    sender.events.clear()
-    await feed("收工", msg_id="fg2")
-    expect(
-        "没砸够不能收工",
-        any("再砸" in text for kind, text in sender.events if kind == "text"),
-    )
-    sender.events.clear()
-    await feed("用力砸", msg_id="fg3")
-    expect(
-        "用力砸有结果",
-        any("回合" in text for kind, text in sender.events if kind == "text"),
-    )
-
-    handler.forge.clear()
-    sender.events.clear()
-    await feed("锻造 石剑", msg_id="fg6")
-    handler.forge.rng = StubRng([0.5, 0.99, 1.2] * 3)
-    await feed("用力砸3", msg_id="fg7")
-    expect(
-        "用力砸3 一条消息回三行",
-        any(
-            kind == "text" and text.count("已进行") == 3
-            for kind, text in sender.events
-        ),
-    )
-
-    handler.forge.clear()
-    sender.events.clear()
-    await feed("锻造 石剑", msg_id="fg8")
-    handler.forge.rng = StubRng([0.5, 0.99, 1.2] * 10)
-    await feed("用力砸99", msg_id="fg9")
-    expect(
-        "用力砸99 截到 10 下并提示",
-        any(
-            kind == "text"
-            and text.count("已进行") == 10
-            and "最多连砸" in text
-            for kind, text in sender.events
-        ),
-    )
-
-    handler.forge.clear()
-    sender.events.clear()
-    await feed("锻造 石剑", msg_id="fg10")
-    handler.forge.rng = StubRng([0.5, 0.99, 1.2, 0.0, 40])
-    await feed("用力砸5", msg_id="fg11")
-    expect(
-        "用力砸5 碰到失败就停、并说明剩下几下",
-        any(
-            kind == "text"
-            and text.count("已进行") == 2
-            and "先停手" in text
-            and "剩下的 3 下" in text
-            for kind, text in sender.events
-        ),
-    )
     handler.forge.rng = random
 
-    handler.forge.clear()
-    sender.events.clear()
-    await feed("附魔 保护", msg_id="fg4")
     expect(
-        "没局时附魔只提示",
-        any("先发" in text for kind, text in sender.events if kind == "text"),
+        "四种材料的价格与初始属性（强度/硬度/韧性）",
+        [(m.name, m.price, m.attrs) for m in MATERIALS.values()]
+        == [("草钢", 140, (20, 15, 15)), ("陨铁", 280, (25, 30, 20)),
+            ("弹簧钢", 620, (35, 30, 45)), ("强化合金", 1288, (60, 55, 40))],
     )
-    sender.events.clear()
-    await feed("锻造排行榜", msg_id="fg5")
+    expect(
+        "每种材料的刀型概率加起来是 1",
+        all(abs(sum(m.knives) - 1.0) < 1e-9 for m in MATERIALS.values()),
+    )
+    expect(
+        "八种刀型、价值依次上升（骷髅 275 / 锯齿 450 / 蝴蝶 650 / 爪子 900）",
+        [k.name for k in KNIVES]
+        == ["廓尔喀刀", "折叠刀", "骷髅匕首", "刺刀", "锯齿爪刀",
+            "蝴蝶刀", "爪子刀", "M9刺刀"]
+        and [k.base for k in KNIVES] == [120, 230, 310, 390, 490, 680, 920, 1200],
+    )
+    expect(
+        "每种材料的刀型概率表和刀型数量对得上",
+        all(len(m.knives) == len(KNIVES) for m in MATERIALS.values()),
+    )
+    expect(
+        "十二个基础模板 + 四个特殊模板（全蓝淬火 15×、三种宝石 10×）",
+        len(PATTERNS) == 12
+        and PATTERN_MULTIPLIER["全蓝淬火"] == 15.0
+        and PATTERN_MULTIPLIER["蓝宝石"] == 10.0
+        and PATTERN_MULTIPLIER["红宝石"] == 10.0
+        and PATTERN_MULTIPLIER["绿宝石"] == 10.0
+        and all(name not in {p.name for p in PATTERNS}
+                for name in ("蓝宝石", "红宝石", "绿宝石", "全蓝淬火")),
+    )
+    expect(
+        "水淬 / 油淬的图案概率各自加起来是 1",
+        all(abs(sum(QUENCH_PROBABILITIES[name]) - 1.0) < 1e-9
+            for name in QUENCH_NAMES),
+    )
+    expect(
+        "测试改成正态：分数 ~ N(属性, 属性/10)（属性 100 平均 100 分、150 平均 150 分）",
+        mean_score(0) == 0 and mean_score(50) == 50
+        and mean_score(100) == 100 and mean_score(150) == 150
+        and score_sigma(100) == 10 and score_sigma(50) == 5,
+    )
+    rnd = random.Random(7)
+    samples = [score_for(75, rnd) for _ in range(600)]
+    expect(
+        "正态出分：均值贴着 75，而且不是死数",
+        abs(sum(samples) / len(samples) - 75) < 4 and len(set(samples)) > 10,
+    )
+    expect(
+        "标准差 = 属性的 1/10：反复测，分差能拉开 20 分以上",
+        max(samples) - min(samples) >= 20,
+    )
+    expect(
+        "出分没有上限（能考过 100）、下限仍是 0",
+        max(score_for(100, random.Random(i)) for i in range(300)) > 100
+        and all(score_for(-50, random.Random(i)) >= 0 for i in range(50)),
+    )
+    expect(
+        "高分不再爆炸：300 分给满 T，超过 300 的部分按 35% 折算",
+        round(performance(300), 3) == 4.35
+        and effective_score(400) == 335.0
+        and round(performance(400), 3) == 5.955,
+    )
+    expect(
+        "总价值 = B×P×T×材料系数（M9刺刀 + 红宝石 + 300 分 = 52200）",
+        value_of(MATERIALS["强化合金"], "M9刺刀", "红宝石", 300) == 52200,
+    )
+    expect(
+        "0 分总价值为 0（不保底）",
+        value_of(MATERIALS["强化合金"], "M9刺刀", "红宝石", 0) == 0,
+    )
+    expect(
+        "价格反推后材料系数全是 1.00",
+        all(m.payout == 1.0 for m in MATERIALS.values()),
+    )
+    expect(
+        "波动半径 ±10 起步、逐锤 +1、封顶 ±15",
+        [hammer_radius(i) for i in (0, 1, 5, 6, 7, 40)]
+        == [10, 11, 15, 15, 15, 15],
+    )
+    expect(
+        "线性曲线：塑性 0/20/50/80/100 → 期望 -10 / -6 / 0 / +6 / +10",
+        (hammer_expect(0), hammer_expect(20), hammer_expect(50),
+         hammer_expect(80), hammer_expect(100)) == (-10, -6, 0, 6, 10),
+    )
+    expect(
+        "磨损：三项越均匀越新（全同 → 崭新，差一大截 → 战痕）",
+        wear_value((80, 80, 80)) <= 0.07
+        and wear_value((30, 60, 90)) >= 0.45
+        and wear_grade(0.02)[1] == 1.15
+        and wear_grade(0.10)[1] == 1.05
+        and wear_grade(0.30)[1] == 1.00
+        and wear_grade(0.40)[1] == 0.95
+        and wear_grade(0.60)[1] == 0.85,
+    )
+    expect(
+        "塑性期望直接平移范围（塑性 60、半径 10 → -8 ~ +12）",
+        hammer_range(10, 60) == (-8, 12)
+        and hammer_range(10, 50) == (-10, 10)
+        and hammer_range(10, 100) == (0, 20),
+    )
+    expect("开局塑性是区间，而且贵料不一定高",
+           [m.plasticity for m in MATERIALS.values()]
+           == [(62, 78), (52, 68), (52, 72), (45, 60)])
+
+    class FixedRng:
+        """random() 恒为 0（刀型/图案都抽第一个），randint 取上限、gauss 取均值。
+
+        ``choice`` 不能死给第一个 —— 锻造 id 是靠 choice 拼的，全给同一个字符
+        会让 id 一直撞、白白卡住。
+        """
+
+        def __init__(self):
+            self.turn = 0
+
+        def random(self):
+            return 0.0
+
+        def choice(self, seq):
+            self.turn += 1
+            return seq[self.turn % len(seq)]
+
+        def randint(self, low, high):
+            return high
+
+        def gauss(self, mu, sigma):
+            return mu
+
+    class CrashRng(FixedRng):
+        """randint 取下限：每锤都把属性往下砸，用来测归零报废。"""
+
+        def randint(self, low, high):
+            # 比下限还低 100：确保盖过塑性加成，直接砸穿
+            return low - 100
+
+    def nf_button(label):
+        rows = sender.panels[-1] if sender.panels else []
+        for row in rows:
+            for button in row["buttons"]:
+                if button["render_data"]["label"] == label:
+                    return button["action"]["data"]
+        return ""
+
+    def nf_labels():
+        rows = sender.panels[-1] if sender.panels else []
+        return [button["render_data"]["label"]
+                for row in rows for button in row["buttons"]]
+
+    async def nf(content, user="N1", name="锻造测试"):
+        sender.events.clear()
+        sender.panels.clear()
+        await handler.handle(Incoming(
+            group_openid="G1", user_openid=user, username=name,
+            content=content, msg_id="nf",
+        ))
+
+    async def nf_click(action, argument="", user="N1", name="锻造测试"):
+        session = new_forge.active("G1", user)
+        await nf(panel_data(session, action, argument), user=user, name=name)
+
+    handler.cards.grant_shards("N1", 3000)
+    new_forge.rng = FixedRng()
+
+    await nf("锻造")
+    expect(
+        "「锻造」发的是带按钮的选材面板",
+        bool(sender.panels) and bool(sender.events) and sender.events[0][0] == "panel",
+    )
+    expect(
+        "选材面板 = 四种材料（按钮上只写材料名，不带价格）",
+        nf_labels() == ["草钢", "陨铁", "弹簧钢", "强化合金"],
+    )
+    expect(
+        "选材按钮排两行两列（一行四个太窄会被截）",
+        bool(sender.panels) and len(sender.panels[-1]) == 2
+        and all(len(row["buttons"]) == 2 for row in sender.panels[-1]),
+    )
+    session = new_forge.active("G1", "N1")
+    expect("开局建好了，第一块面板的序号是 1", session is not None and session.seq == 1)
+
+    shards_before = handler.cards.shards_of("N1")
+    await nf(nf_button("草钢"))
+    session = new_forge.active("G1", "N1")
+    expect("选材扣 140 银币", handler.cards.shards_of("N1") == shards_before - 140)
+    expect(
+        "买完料进锻造阶段，刀型和初始属性都定下来",
+        session.stage == STAGE_FORGE
+        and session.knife == "廓尔喀刀"
+        and session.attrs == [20, 15, 15],
+    )
+    expect("锻造面板 = 用力砸 / 结束锻造", nf_labels() == ["用力砸", "结束锻造"])
+    expect(
+        "面板写着下一锤的实际范围（±10 被塑性 +6 平移成 -4~+16）",
+        bool(sender.events) and "下一锤 -4 ~ +16" in sender.events[0][1],
+    )
+
+    _session = new_forge.active("G1", "N1")
+    _rejected = new_forge.act(
+        "G1", "N1", _session.forge_id, _session.seq, ACTION_RECOVER, "",
+    )
+    expect(
+        "没砸够 5 锤不能回火",
+        not _rejected["ok"] and "回火还差" in _rejected["reply"],
+    )
+
+    old_strike = nf_button("用力砸")
+    await nf(old_strike)
+    session = new_forge.active("G1", "N1")
+    expect(
+        "用力砸一次：次数 +1、三项属性各 +16（半径 10 + 塑性期望 6）",
+        session.hammers == 1 and session.attrs == [36, 31, 31],
+    )
+    expect(
+        "面板写出这一锤的增减（+16 = 半径 10 + 塑性 6）",
+        bool(sender.events)
+        and "强度 36（+16）" in sender.events[0][1],
+    )
+    expect(
+        "锻造面板不再写「-5~+5、砸够了就结束锻造」那行说明",
+        bool(sender.events) and "砸够了就" not in sender.events[0][1],
+    )
+    expect(
+        "删掉说明后面板不空：底下有一句随机闲话",
+        any(line in sender.events[0][1]
+            for line in FORGE_FLAVOR + FORGE_FLAVOR_OPEN + FORGE_FLAVOR_DANGER),
+    )
+    await nf(old_strike)
+    expect(
+        "同一块面板点第二次不生效（面板只能点一次）",
+        new_forge.active("G1", "N1").hammers == 1
+        and any("用过" in text for kind, text in sender.events if kind == "text"),
+    )
+
+    for _ in range(4):
+        await nf_click(ACTION_HAMMER)
+    session = new_forge.active("G1", "N1")
+    expect(
+        "连砸 5 锤：半径 10/11/12/13/14 + 线性加成（6/5/4/4/3），属性 102/97/97",
+        session.hammers == 5 and session.attrs == [102, 97, 97],
+    )
+    expect("没有次数上限：面板照样给「用力砸」", "用力砸" in nf_labels())
+    expect("砸够 5 锤后出现「回火」按钮", "回火" in nf_labels())
+    expect("每砸一锤塑性 -3（78 → 63）", new_forge.active("G1", "N1").plasticity == 63)
+
+    await nf_click(ACTION_RECOVER)
+    session = new_forge.active("G1", "N1")
+    expect(
+        "回火按正态重摇（均值固定 55），并记一次",
+        session.recoveries == 1 and session.plasticity == 55,
+    )
+    expect("回火不动属性", session.attrs == [102, 97, 97])
+    expect("刚回火完不能马上再回火", "回火" not in nf_labels())
+
+    await nf_click(ACTION_FINISH)
+    expect("结束锻造进淬火面板", nf_labels() == ["水淬", "油淬"])
+    expect(
+        "淬火面板写着当前属性",
+        bool(sender.events) and "强度 102" in sender.events[0][1],
+    )
+
+    before_quench = handler.cards.shards_of("N1")
+    await nf_click(ACTION_WATER)
+    result = sender.events[0][1] if sender.events else ""
+    expect("淬火后只回一条文字结果", bool(sender.events) and sender.events[0][0] == "text")
+    expect(
+        "结果里三项得分 102/97/97、总分 296、总价值 463（磨损崭新 ×1.15）",
+        "强度 102 → 102 分" in result
+        and "硬度 97 → 97 分" in result
+        and "测试得分 296（基准满分 300）" in result
+        and "崭新出厂" in result
+        and "463" in result,
+    )
+    expect(
+        "总价值直接加进余额",
+        handler.cards.shards_of("N1") == before_quench + 463,
+    )
+    expect("一局结束局面就清掉", new_forge.active("G1", "N1") is None)
+
+    mine = next(
+        (item for item in handler.forge_rank.leaderboard()
+         if item["name"] == "锻造测试"), None,
+    )
+    expect(
+        "排行榜记下刀型 / 图案 / 分数 / 总价值",
+        mine is not None
+        and mine["knife"] == "廓尔喀刀"
+        and mine["pattern"] == "狩猎网格"
+        and mine["score"] == 296
+        and mine["value"] == 463,
+    )
+
+    # 属性归零：这一炉直接报废，材料钱不退、一分收益都没有
+    handler.cards.grant_shards("N3", 1000)
+    new_forge.rng = CrashRng()
+    await nf("锻造", user="N3", name="报废测试")
+    await nf(nf_button("草钢"), user="N3", name="报废测试")
+    before_crash = handler.cards.shards_of("N3")
+    for _ in range(6):
+        if new_forge.active("G1", "N3") is None:
+            break
+        await nf_click(ACTION_HAMMER, user="N3", name="报废测试")
+    expect("任一属性归零 → 这一局当场结束", new_forge.active("G1", "N3") is None)
+    expect(
+        "失败提示写明报废、没有任何收益",
+        any("报废" in text and "没有任何收益" in text
+            for kind, text in sender.events if kind == "text"),
+    )
+    expect(
+        "报废不返材料钱、也不发收益",
+        handler.cards.shards_of("N3") == before_crash,
+    )
+
+    # 银币不足：面板先摆出来，选贵的料被拒，但局面和面板都不作废
+    new_forge.rng = FixedRng()
+    handler.cards.user("N2")["shards"] = 10
+    handler.cards._save()
+    await nf("锻造", user="N2", name="穷鬼")
+    expect("银币不够也能先把面板摆出来", nf_labels()[:1] == ["草钢"])
+    await nf(nf_button("强化合金"), user="N2", name="穷鬼")
+    expect(
+        "买不起的料直接拒绝",
+        any("银币不够" in text for kind, text in sender.events if kind == "text"),
+    )
+    expect(
+        "被拒后还停在选材、面板可以接着点",
+        new_forge.active("G1", "N2") is not None
+        and new_forge.active("G1", "N2").stage == STAGE_PICK,
+    )
+
+    await nf("锻造", user="N2", name="穷鬼")
+    expect(
+        "已有没做完的一局时再开被拒",
+        any("没做完" in text for kind, text in sender.events if kind == "text"),
+    )
+    new_forge.clear()
+
+    for command in ("锻造 石剑", "用力砸", "结束锻造", "收工", "附魔 锋利", "重构"):
+        await nf(command)
+        expect(f"旧锻造命令「{command}」完全没反应", sender.events == [])
+
+    await nf("锻造排行榜")
     expect(
         "排行榜文字兜底",
         any("锻造排行榜" in text for kind, text in sender.events if kind == "text"),
     )
+    new_forge.rng = random
 
     print("== 自动复读 +1 ==")
     sender.events.clear()
@@ -2070,6 +2709,206 @@ async def selftest() -> int:
     finally:
         handler_module.cs_card = original_card
     handler.cs = real_cs
+
+    print("== 语音 ==")
+    # 命令解析：必须带分隔符。全量消息模式下，群里随口一句「说得好」不该被当成命令。
+    expect("「语音：你好呀」解析出内容", tts_payload("语音：你好呀") == "你好呀")
+    expect("「语音 你好」也认（空格）", tts_payload("语音 你好") == "你好")
+    expect("「/语音:你好」带斜杠也认", tts_payload("/语音:你好") == "你好")
+    expect("「说 你好」是短写法", tts_payload("说 你好") == "你好")
+    expect("「说话 你好」认", tts_payload("说话 你好") == "你好")
+    expect("「说得好」不算命令", tts_payload("说得好") is None)
+    expect("只写「语音」返回空（给用法）", tts_payload("语音") == "")
+    expect("「保存吊图 测试」不会被当语音", tts_payload("保存吊图 测试") is None)
+    expect("「发语音 xxx」不再是命令", tts_payload("发语音 xxx") is None)
+    cleaned = clean_for_tts("**看** <qqbot-at-user id=\"1\" /> https://b23.tv/x 喵~\n第二行")
+    expect("洗掉 markdown / @ 标记 / 链接",
+           "**" not in cleaned and "http" not in cleaned
+           and "<qqbot" not in cleaned and "喵" in cleaned)
+
+    # 引擎顺序：自训的 GPT-SoVITS 优先，挂了自动退 edge / sapi
+    from . import voice as voice_module
+
+    expect("auto 顺序是 gsv → edge → sapi", engine_order() == ["gsv", "edge", "sapi"])
+    expect("指定 edge 就只用 edge", engine_order("edge") == ["edge"])
+    expect("gsv 可用性跟着配置走",
+           gsv_available() == (GSV_ENABLED and Path(GSV_DIR, "api_v2.py").is_file()))
+    if gsv_available():
+        expect("describe 里写了 GPT-SoVITS", "GPT-SoVITS" in describe())
+
+    # 群消息换嗓子：解析 / 列表 / 切换 / 持久化。状态文件指到临时目录，别动真的。
+    expect("「语音模型」是看列表", voice_model_payload("语音模型") == ("list", ""))
+    expect("「语音模型列表」也认",
+           voice_model_payload("语音模型列表") == ("list", ""))
+    expect("「语音模型 铃兰」是切换",
+           voice_model_payload("语音模型 铃兰") == ("switch", "铃兰"))
+    expect("「换语音 能天使」也认",
+           voice_model_payload("换语音 能天使") == ("switch", "能天使"))
+    expect("「换语音模型 铃兰」不被「换语音」截断",
+           voice_model_payload("换语音模型 铃兰") == ("switch", "铃兰"))
+    expect("「语音：你好」不算换嗓子", voice_model_payload("语音：你好") is None)
+    expect("「说 你好」不算换嗓子", voice_model_payload("说 你好") is None)
+
+    original_state = voice_module.GSV_MODEL_STATE
+    voice_module.GSV_MODEL_STATE = str(temporary / "voice_model.json")
+    voice_module._MODEL_CACHE = None
+    try:
+        models = scan_models()
+        expect("音色目录扫得到角色", bool(models))
+        if models:
+            before = current_model().name
+            expect("当前音色在扫描结果里", before in [m.name for m in models])
+            other = next((m for m in models if m.name != before), None)
+            if other is not None:
+                switched = switch_model(other.name)
+                expect("切换后当前音色变了",
+                       current_model().name == switched.name)
+                expect("切换写进了状态文件",
+                       (temporary / "voice_model.json").is_file())
+                voice_module._MODEL_CACHE = None
+                expect("重读状态文件还是新音色",
+                       current_model().name == switched.name)
+                expect("重复切同一个不报错",
+                       switch_model(switched.name).name == switched.name)
+                expect("换不存在的角色会报错",
+                       _raises(lambda: switch_model("不存在的角色"), VoiceError))
+                expect("列表文案说清了当前音色",
+                       "现在用的是" in models_text())
+    finally:
+        voice_module.GSV_MODEL_STATE = original_state
+        voice_module._MODEL_CACHE = None
+
+    visited: list[str] = []
+
+    async def fake_gsv(text, directory):
+        visited.append("gsv")
+        raise VoiceError("假装挂了")
+
+    async def fake_edge(text, directory):
+        visited.append("edge")
+        out = temporary / "fallback.mp3"
+        out.write_bytes(b"ID3" + b"\x00" * 2048)
+        return out
+
+    originals = (
+        voice_module._synth_gsv, voice_module._synth_edge, voice_module.engine_available,
+    )
+    voice_module._synth_gsv = fake_gsv
+    voice_module._synth_edge = fake_edge
+    voice_module.engine_available = lambda name: True
+    try:
+        fallback_path = await synthesize("你好呀")
+        expect("gsv 失败自动退到 edge",
+               visited == ["gsv", "edge"] and fallback_path.name == "fallback.mp3")
+        fallback_path.unlink(missing_ok=True)
+    finally:
+        (voice_module._synth_gsv, voice_module._synth_edge,
+         voice_module.engine_available) = originals
+
+    # 现场合成：自检不联网、也不该真去开 PowerShell，把 synthesize 换成假的
+    from . import handler as handler_module
+
+    synthesised: list[str] = []
+
+    async def fake_synthesize(text, **kwargs):
+        synthesised.append(text)
+        out = temporary / "tts.wav"
+        out.write_bytes(b"RIFF" + b"\x00" * 2048)
+        return out
+
+    original_synth = handler_module.synthesize
+    handler_module.synthesize = fake_synthesize
+    try:
+        sender.events.clear()
+        await feed("语音：你好呀", msg_id="voice-1")
+        expect("「语音：你好呀」发语音条", sender.events == [("voice", "tts.wav")])
+        expect("念的正是冒号后面那句", synthesised == ["你好呀"])
+
+        sender.events.clear()
+        await feed("语音", msg_id="voice-2")
+        expect("只写「语音」提示用法",
+               any(kind == "text" and "语音：你好呀" in text for kind, text in sender.events))
+
+        sender.events.clear()
+        await feed("说得好", msg_id="voice-3")
+        expect("「说得好」不合成语音", sender.events == [])
+
+        sender.events.clear()
+        await feed("发语音 xxx", msg_id="voice-4")
+        expect("「发语音」不再有任何反应", sender.events == [])
+
+        # 换嗓子：群消息 → 列表 / 换 / 冷却。状态文件指临时目录。
+        original_state2 = voice_module.GSV_MODEL_STATE
+        voice_module.GSV_MODEL_STATE = str(temporary / "handler_voice_model.json")
+        voice_module._MODEL_CACHE = None
+        handler.last_voice_switch = 0.0
+        try:
+            sender.events.clear()
+            await feed("语音模型", msg_id="model-1")
+            expect("「语音模型」回列表",
+                   any(kind == "text" and "能换的" in text
+                       for kind, text in sender.events))
+
+            sender.events.clear()
+            await feed("语音模型 不存在的角色", msg_id="model-2")
+            expect("换不存在的角色会明说",
+                   any(kind == "text" and "没有" in text
+                       for kind, text in sender.events))
+
+            sender.events.clear()
+            await feed("语音模型 能天使", msg_id="model-3")
+            expect("换嗓子成功并回复名字",
+                   any(kind == "text" and "能天使" in text
+                       for kind, text in sender.events))
+            expect("换嗓子写了状态文件",
+                   (temporary / "handler_voice_model.json").is_file())
+
+            sender.events.clear()
+            await feed("语音模型 铃兰", msg_id="model-4")
+            expect("60 秒内再换被冷却拦住",
+                   any(kind == "text" and "秒后再来" in text
+                       for kind, text in sender.events))
+        finally:
+            voice_module.GSV_MODEL_STATE = original_state2
+            voice_module._MODEL_CACHE = None
+            handler.last_voice_switch = 0.0
+
+        # 长文本：按标点切成几条连着发，不硬念成一条几分钟的语音
+        long_text = (
+            "那是科隆Major赛场，一场足以载入CS史册的巅峰加冕。场馆万众屏息，"
+            "喧嚣与沉寂反复更迭，每一次枪声、每一回残局，都是追梦路上最滚烫的注脚。"
+            "十余载浮沉逐梦，无数次决赛折戟、无数轮遗憾离场，命运无数次将希望与重担，"
+            "压在孤身前行的NiKo肩上。"
+        ) * 2
+        pieces = split_for_voice(long_text)
+        expect("短句不拆段", split_for_voice("你好呀") == ["你好呀"])
+        expect("空文本不产段", split_for_voice("   ") == [])
+        expect(f"长文拆成多段（{len(long_text)} 字 → {len(pieces)} 段）", len(pieces) > 1)
+        expect(f"每段不超过 {VOICE_CHUNK_CHARS} 字",
+               all(len(piece) <= VOICE_CHUNK_CHARS for piece in pieces))
+        expect("都在标点处断开，不拦腰砍",
+               all(piece[-1] in "。！？!?，,、：:" for piece in pieces[:-1]))
+        expect("内容没丢",
+               sum(len(piece) for piece in pieces) >= len(long_text) - 2 * len(pieces))
+
+        sender.events.clear()
+        await feed("语音：" + long_text, msg_id="voice-6")
+        voices = [name for kind, name in sender.events if kind == "voice"]
+        expect(f"长文本连发 {len(pieces)} 条语音", len(voices) == len(pieces))
+
+        sender.events.clear()
+        await feed("语音：" + "啊" * (VOICE_MAX_CHARS + 1), msg_id="voice-7")
+        expect("超过总上限时只回文字、不发语音",
+               all(kind == "text" for kind, _ in sender.events)
+               and any(str(VOICE_MAX_CHARS) in text for kind, text in sender.events))
+
+        handler_module.VOICE_ENABLED = False
+        sender.events.clear()
+        await feed("语音：你好呀", msg_id="voice-5")
+        expect("关掉 QQCHATBOT_VOICE 后不响应", sender.events == [])
+    finally:
+        handler_module.synthesize = original_synth
+        handler_module.VOICE_ENABLED = True
 
     print("== 规则覆盖 ==")
     rules_path = paths.data / "official_rules.json"

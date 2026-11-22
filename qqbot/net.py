@@ -234,6 +234,9 @@ class Gateway:
                 return
 
     async def _dispatch(self, event_type: str, data: dict) -> None:
+        if event_type == "INTERACTION_CREATE":
+            await self._handle_interaction(data)
+            return
         if event_type in ("GROUP_AT_MESSAGE_CREATE", "GROUP_MESSAGE_CREATE"):
             if DEBUG:
                 raw = str(data.get("content") or "")
@@ -265,6 +268,36 @@ class Gateway:
             log(f"[事件] {event_type}")
             return
         log(f"[事件] 忽略 {event_type}")
+
+    async def _handle_interaction(self, data: dict) -> None:
+        """按钮点击：先回应事件（3 秒内，否则用户端一直转圈），再走命令分发。
+
+        回应和业务处理要分开看：回应只是"我知道了"这个 ACK，业务答复是另发的
+        被动消息（锚点是 event_id）。所以哪怕业务抛错，ACK 也必须发出去。
+        """
+        interaction_id = str(data.get("id") or "")
+        resolved = (data.get("data") or {}).get("resolved") or {}
+        button_data = str(resolved.get("button_data") or "")
+        log(
+            f"[按钮] 点击 {button_data!r} 群={str(data.get('group_openid') or '')[:8]}… "
+            f"人={str(data.get('group_member_openid') or '')[:8]} "
+            f"id={interaction_id[:20]}…（{'带前缀' if ':' in interaction_id else '裸 id'}）"
+        )
+        if interaction_id:
+            try:
+                await self.api.interaction_ack(interaction_id, 0 if button_data else 1)
+            except Exception as error:  # noqa: BLE001 - ACK 失败也不能挡住业务
+                log(f"[按钮] 回应互动失败：{error!r}")
+        if self._is_duplicate(interaction_id):
+            log(f"[按钮] 跳过重复互动 {interaction_id[:12]}…")
+            return
+        event = parse_interaction_event(data)
+        if event is None:
+            log("[按钮] 不是消息按钮点击，忽略")
+            return
+        task = asyncio.create_task(self._handle_event(event))
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
 
     async def _handle_event(self, event: Incoming) -> None:
         try:

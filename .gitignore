@@ -16,6 +16,12 @@ config/*.local.txt
 data/*
 !data/.gitkeep
 
+# 语音模型权重（GPT-SoVITS 训练产物，单个 .ckpt 149M，超出 GitHub 单文件上限）
+models/
+*.ckpt
+*.pth
+*.onnx
+
 # 日志与本地备份
 logs/
 backup/

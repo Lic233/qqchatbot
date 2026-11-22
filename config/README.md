@@ -22,9 +22,19 @@ clone 下来后需要自己新建。
 - `persona.txt` —— 人设卡（角色设定 / 说话风格）
 - `help.txt` —— 群内帮助文案
 - `changelog.txt` / `changelog_legacy.txt` —— 更新日志
-- `锻造系统.txt` —— 锻造系统的数值与文案
+- `新锻造系统.txt` —— 现在这套锻造（选材 / 锻造 / 淬火 / 测试）的数值与文案
+- `锻造系统.txt` —— 旧锻造（石剑 / 铁剑 / 钻石剑 + 附魔书）的规则，入口已关，留作参考
 
 改完配置重启进程生效（环境变量在 import 时只读一次）。
+
+## 可选依赖
+
+- **Pillow** —— 库存图 / 签到图 / CS2 卡片；没装就只发文字
+- **GPT-SoVITS**（可选）—— 本地自训音色的引擎，默认优先用；要在
+  `F://GPTSoVITS` 有整合包 + `GPTSoVits` conda 环境，路径可用 `QQCHATBOT_GSV_DIR` /
+  `QQCHATBOT_GSV_PYTHON` 改，`QQCHATBOT_GSV=0` 关掉
+- **edge-tts** —— `语音：xxx` 用微软的神经网络音色（`pip install edge-tts`）；
+  没装会自动退回 Windows 自带 SAPI 音色，功能不受影响
 
 ## 运行时数据不在这个目录
 

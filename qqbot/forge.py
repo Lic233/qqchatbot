@@ -1,30 +1,26 @@
-"""锻造系统：砸剑、涨价值、掉完成度、附魔书、按收益换奶龙碎片。
+"""锻造系统：砸剑、涨价值、掉完成度、附魔书、按收益换银币。
 
 规则照 ``data/锻造系统.txt``：
 
 * 开局：``锻造 石剑`` / ``锻造 铁剑`` / ``锻造 钻石剑``，入场费与初始价值
-  分别是 50/250/500，完成度一律从 100 起。碎片不够时明确拒绝，**只有石剑**
-  付不起也照样开局（不扣碎片）。
+  分别是 50/250/500，完成度一律从 100 起。银币不够时明确拒绝，**只有石剑**
+  付不起也照样开局（不扣银币）。
 * 每回合 ``用力砸``：价值增加（石剑 ×1.2~1.4，铁剑 ×1.3~1.5，钻石剑 ×1.4~1.6）、
   不变、或**锻造失败**。三档概率逐回合查表，第 5 回合后沿用第 5 行。
   写成 ``用力砸5`` 就是一次连砸 5 回合，结果按回合合并成一条消息（最多 10 下），
   中途**锻造失败就停下**，后面的回合不再自动砸。
 * 失败**不再降低价值**，改成掉随机 30~50 完成度（``COMPLETION_LOSS``）；
-  完成度掉到 0 或以下时剑彻底崩了，局当场结束、拿 0 碎片。
+  完成度掉到 0 或以下时剑彻底崩了，局当场结束、拿 0 银币。
 * 锻造成功（「增加」）时完成度回复 3 点（``COMPLETION_RECOVER``），上限仍是 100。
-* 触发「增加」时另判一次幸运暴击（3%/8%/12%，倍率 ×2.0~2.5）。
+* 触发「增加」时另判一次幸运暴击（3%/8%/12%，倍率 ×1.8~2.3）。
 * 砸满 3 回合后 ``结束锻造``（别名 ``收工``）按
-  ``完成度/100 × 5000 × ln(1 + 价值/5000)`` 发碎片（见 ``reward_for``）：
+  ``完成度/100 × 5000 × ln(1 + 价值/5000)`` 发银币（见 ``reward_for``）：
   完成度是等比折扣，价值走对数曲线；价值越小越接近原值，接近 5000 之后压得越狠。
 * 附魔书（开箱 20% 开出，可累积）：一局最多用 7 个次数，效果见 ``BOOK_EFFECTS``；
   「升格」把剑换成下界合金剑并吃 2 个次数。
 * 重构：``附魔 重构`` 给下一锤 2 次重掷机会，且这一锤只要「增加」就必定暴击；
   ``重构`` 命令重掷；认下就作废剩余次数。
 * 每次成功收工记一条锻造排行榜（见 forge_rank.py）。
-* **无头骑士剑**（限时，见 ``headless_available``）：入场费 1000、初始价值 1000、
-  完成度从 50 起；概率恒定 25/45/30，倍率 1.3~1.5、暴击 15%；
-  不能用附魔书，失败只掉 20~40 完成度，自带「经验修补」（增加/不变都 +5 完成度），
-  收益封顶 ``HEADLESS_REWARD_CAP``；开局随机抽一个诅咒（见 ``CURSE_EFFECTS``）。
 
 局内进度只放内存（重启就散），排行榜才落盘。
 """
@@ -34,10 +30,9 @@ import math
 import random
 import re
 from dataclasses import dataclass
-from datetime import date
 
 from .base import log
-from .cards import CARD_BOX_BOOK_PROBABILITY, ENCHANT_BOOKS, Cards
+from .cards import ENCHANT_BOOKS, Cards
 from .forge_rank import ForgeRank, TOP_N, ordinal
 
 # 砸几次才准「结束锻造」。
@@ -57,15 +52,6 @@ OUTCOME_FAIL = "fail"
 OUTCOME_INCREASE = "increase"
 OUTCOME_UNCHANGED = "unchanged"
 
-# ---- 无头骑士剑（限时活动） ----
-# 总开关：False 就是直接下架。
-HEADLESS_ENABLED = True
-# 起止日期，形如 "2026-10-27"；留空表示这一头不限制。
-HEADLESS_START = ""
-HEADLESS_END = ""
-# 无头骑士剑的收工收益上限，超过只发这么多。
-HEADLESS_REWARD_CAP = 50000
-
 COMMAND_FORGING = "锻造"
 COMMAND_STRIKE = "用力砸"
 COMMAND_FINISH = "结束锻造"
@@ -76,30 +62,6 @@ COMMANDS = (
     COMMAND_FORGING, COMMAND_STRIKE, *COMMAND_FINISH_ALIASES,
     COMMAND_ENCHANT, COMMAND_REFORGE,
 )
-
-
-def headless_available(today: date | None = None) -> bool:
-    """无头骑士剑现在能不能锻造：总开关 + 起止日期（两端都含当天）。
-
-    日期写成 ``YYYY-MM-DD``；留空就是这一头不限制。日期写错（比如手抖打歪了）
-    当没写，不会因为配置笔误把剑锁死。
-    """
-    if not HEADLESS_ENABLED:
-        return False
-    today = today or date.today()
-    for raw, is_start in ((HEADLESS_START, True), (HEADLESS_END, False)):
-        raw = (raw or "").strip()
-        if not raw:
-            continue
-        try:
-            day = date.fromisoformat(raw)
-        except ValueError:
-            continue
-        if is_start and today < day:
-            return False
-        if not is_start and today > day:
-            return False
-    return True
 
 
 def is_finish_command(text: str) -> bool:
@@ -180,22 +142,10 @@ class Sword:
     initial: int
     factor: tuple[float, float]
     crit_chance: float = 0.0
-    # 碎片不够入场费时要不要照样开局（免费、不扣碎片）。只有石剑是 True。
+    # 银币不够入场费时要不要照样开局（免费、不扣银币）。只有石剑是 True。
     free_if_poor: bool = False
     # 能不能直接用「锻造 <剑名>」开局。下界合金剑只能靠「升格」换，所以是 False。
     buyable: bool = True
-    # 开局完成度；无头骑士剑从 50 起。
-    initial_completion: float = INITIAL_COMPLETION
-    # 失败掉的完成度区间；None 表示用全局 COMPLETION_LOSS（30~50）。
-    loss: tuple[int, int] | None = None
-    # 剑身自带「经验修补」：增加/不变都回完成度（无头骑士剑自带，不耗书）。
-    innate_mending: bool = False
-    # 这把剑不接受附魔书（无头骑士剑是 True）。
-    no_books: bool = False
-    # 收工收益上限；None 表示不封顶。
-    reward_cap: float | None = None
-    # 开局随机抽一个诅咒（无头骑士剑是 True）。
-    cursed: bool = False
 
 
 # (失败, 增加, 不变)，按回合 1..5；第 6 回合起沿用第 5 行。
@@ -229,14 +179,6 @@ _TABLES: dict[str, dict[int, tuple[float, float, float]]] = {
         4: (0.20, 0.5000, 0.3000),
         5: (0.20, 0.5000, 0.3000),
     },
-    # 无头骑士剑：限时开放，概率恒定 25/45/30。
-    "headless": {
-        1: (0.25, 0.4500, 0.3000),
-        2: (0.25, 0.4500, 0.3000),
-        3: (0.25, 0.4500, 0.3000),
-        4: (0.25, 0.4500, 0.3000),
-        5: (0.25, 0.4500, 0.3000),
-    },
 }
 
 _INCREASE_FACTOR: dict[str, tuple[float, float]] = {
@@ -244,61 +186,23 @@ _INCREASE_FACTOR: dict[str, tuple[float, float]] = {
     "iron": (1.3, 1.5),
     "diamond": (1.4, 1.6),
     "netherite": (1.6, 1.8),
-    "headless": (1.3, 1.5),
 }
 _CRIT_CHANCE: dict[str, float] = {
     "stone": 0.03,
     "iron": 0.08,
     "diamond": 0.12,
     "netherite": 0.20,
-    "headless": 0.15,
 }
-CRIT_FACTOR: tuple[float, float] = (2.0, 2.5)
+CRIT_FACTOR: tuple[float, float] = (1.8, 2.3)
 
-# ---- 诅咒（无头骑士剑开局随机抽一个，一整局都跟着） ----
-CURSE_BRITTLE = "易碎"
-CURSE_BACKLASH = "反噬"
-CURSE_IMMORTAL = "永生"
-CURSE_UNBALANCED = "失衡"
-CURSE_POISON = "鸩毒"
-CURSE_GLUTTONY = "贪饕"
-CURSE_MUTATION = "畸变"
-CURSES: tuple[str, ...] = (
-    CURSE_BRITTLE, CURSE_BACKLASH, CURSE_IMMORTAL, CURSE_UNBALANCED,
-    CURSE_POISON, CURSE_GLUTTONY, CURSE_MUTATION,
-)
-CURSE_EFFECTS: dict[str, str] = {
-    CURSE_BRITTLE: "本场完成度上限 70，收工时最终收益 ×1.6",
-    CURSE_BACKLASH: "本场暴击率翻四倍（15%→60%），但暴击时完成度 -5",
-    CURSE_IMMORTAL: "本场增加/不变时完成度 +15，完成度到 100% 时强制收工",
-    CURSE_UNBALANCED: "本场失败不降完成度，但失败三次后强制失败",
-    CURSE_POISON: "本场完成度从 100 起；成败都不影响完成度，但每回合固定 -4",
-    CURSE_GLUTTONY: "本场增加价值固定 ×1.1，暴击则固定 ×10",
-    CURSE_MUTATION: "本场失败时价值 ×2，但掉的完成度变成 30~50",
-}
-# 鸩毒：每回合固定掉的完成度（开局完成度直接拉满 100）。
-POISON_TURN_LOSS = 4.0
-# 贪饕：增加价值的固定倍率与暴击的固定倍率。
-GLUTTONY_FACTOR = 1.1
-GLUTTONY_CRIT_FACTOR = 10.0
-# 畸变：失败时的价值倍率与完成度损失区间。
-MUTATION_VALUE_FACTOR = 2.0
-MUTATION_LOSS = (30, 50)
-# 易碎：完成度上限与最终收益倍率（乘在收益上，不乘价值）。
-BRITTLE_COMPLETION_CAP = 70.0
-BRITTLE_REWARD_FACTOR = 1.6
-# 反噬：暴击率翻四倍，暴击时掉的完成度。
-BACKLASH_CRIT_MULTIPLIER = 4.0
-BACKLASH_LOSS = 5.0
-# 永生：「增加/不变」时回的完成度（取代剑身自带的 5 点）；倍率仍是剑本身的 1.3~1.5。
-IMMORTAL_MENDING_RECOVER = 15.0
-# 失衡：累计几次失败就强制失败。
-UNBALANCED_MAX_FAILS = 3
-
-# ---- 附魔书（s1） ----
+# ---- 附魔书（s2） ----
 ENCHANT_MENDING = "经验修补"
 ENCHANT_REFORGE = "重构"
+ENCHANT_SHARP = "锋利"
+ENCHANT_HEAL = "治愈"
 ENCHANT_FORTUNE = "时运"
+ENCHANT_LAST_DANCE = "最后一舞"
+# s1 遗留：本赛季开不出来（见 ``ENCHANT_BOOKS``），机制留着，换季可能回来。
 ENCHANT_UPGRADE = "升格"
 ENCHANT_GUARD = "保护"
 ENCHANT_PLUNDER = "掠夺"
@@ -307,7 +211,10 @@ MAX_BOOKS_PER_FORGE = 7
 BOOK_EFFECTS: dict[str, str] = {
     ENCHANT_MENDING: "每次「增加」或「不变」都回复 5 完成度",
     ENCHANT_REFORGE: "下一锤若「增加」必定暴击，且这一锤最多还能重掷两次（重掷发「重构」）",
+    ENCHANT_SHARP: "本局每次「增加」都按最大倍率（石剑 1.4 / 铁剑 1.5 / 钻石剑 1.6）",
+    ENCHANT_HEAL: "本局每次暴击额外回复 15 完成度，最多生效 2 次",
     ENCHANT_FORTUNE: "本局暴击率翻五倍，触发两次暴击后失效",
+    ENCHANT_LAST_DANCE: "立刻 +30 完成度，三回合后 -30；三回合内收工收益减半",
     ENCHANT_UPGRADE: "消耗 2 个附魔书次数，把剑换成下界合金剑",
     ENCHANT_GUARD: "三回合后获得一次保护：下一次失败不减少完成度（一局一次）",
     ENCHANT_PLUNDER: "本局「不变」也会涨价值，倍率 1.2~1.4",
@@ -316,6 +223,14 @@ FORTUNE_MULTIPLIER = 5.0
 FORTUNE_CRITS = 2
 PLUNDER_FACTOR: tuple[float, float] = (1.2, 1.4)
 MENDING_RECOVER = 5.0
+# 「治愈」：暴击时额外回的完成度与生效次数上限。
+HEAL_RECOVER = 15.0
+HEAL_CHARGES = 2
+# 「最后一舞」：立刻涨多少、几回合后扣多少、提前收工的收益倍率。
+LAST_DANCE_GAIN = 30.0
+LAST_DANCE_LOSS = 30.0
+LAST_DANCE_TURNS = 3
+LAST_DANCE_PENALTY = 0.5
 # 「保护」要砸满几回合才给保护次数（和「结束锻造」的最低回合数一致）。
 GUARD_AFTER_TURNS = FORGE_MIN_TURNS
 REFORGE_MAX_TIMES = 2
@@ -330,24 +245,10 @@ SWORDS: dict[str, Sword] = {
     "netherite": Sword("netherite", "下界合金剑", 300, 300,
                        _INCREASE_FACTOR["netherite"],
                        _CRIT_CHANCE["netherite"], buyable=False),
-    "headless": Sword(
-        "headless", "无头骑士剑", 1000, 1000,
-        _INCREASE_FACTOR["headless"], _CRIT_CHANCE["headless"],
-        initial_completion=50.0, loss=(20, 40), innate_mending=True,
-        no_books=True, reward_cap=HEADLESS_REWARD_CAP, cursed=True,
-    ),
 }
 BUYABLE_SWORDS: tuple[Sword, ...] = tuple(
     sword for sword in SWORDS.values() if sword.buyable
 )
-
-
-def buyable_now() -> tuple[Sword, ...]:
-    """现在真的能开局买的剑：无头骑士剑要看限时开关。"""
-    return tuple(
-        sword for sword in BUYABLE_SWORDS
-        if sword.key != "headless" or headless_available()
-    )
 SWORD_BY_NAME: dict[str, Sword] = {sword.name: sword for sword in BUYABLE_SWORDS}
 SWORD_NAMES = tuple(sword.name for sword in BUYABLE_SWORDS)
 TABLE_LAST_TURN = 5
@@ -399,7 +300,7 @@ def reward_for(value: float, completion: float) -> int:
 
     完成度是**乘在 log 外面**的等比折扣，所以 50% 完成度就是拿一半。
     价值远小于 K 时 ``ln(1+x) ≈ x``，基本还是「价值 × 完成度 / 100」；
-    价值超过 K 后收益被对数压住，每翻 e 倍价值只多 K 碎片。
+    价值超过 K 后收益被对数压住，每翻 e 倍价值只多 K 银币。
     """
     value = max(0.0, float(value))
     completion = min(max(0.0, float(completion)), INITIAL_COMPLETION)
@@ -429,21 +330,13 @@ class StrikeResult:
     fortune_crit: bool = False
     plunder: bool = False
     mending: bool = False
-    # 剑身自带的经验修补（无头骑士剑），文案要区分「不是附魔书给的」。
-    innate_mending: bool = False
+    # 治愈：这一锤暴击吃了一次额外回复；heal_left 是吃完剩下的次数。
+    healed: bool = False
+    heal_left: int = 0
+    # 最后一舞：这一锤正好到三回合，被扣了完成度。
+    dance_drop: bool = False
     deferred: bool = False
     reforge_left: int = 0
-    # 诅咒相关
-    unbalanced: bool = False
-    fails: int = 0
-    backlash: bool = False
-    # 鸩毒：这一回合被固定啃掉完成度；畸变：失败反而涨了价值。
-    poisoned: bool = False
-    mutated: bool = False
-    forced_end: bool = False
-    forced_fail: bool = False
-    reward: int = 0
-    shards: int = 0
 
     @property
     def failed(self) -> bool:
@@ -457,7 +350,7 @@ class StrikeResult:
 
     @property
     def ruined(self) -> bool:
-        """完成度是不是归零了（含「反噬」把完成度啃光的情况）。"""
+        """完成度是不是归零了。"""
         return self.completion <= 0
 
 
@@ -468,8 +361,6 @@ class ForgeSession:
     sword: str
     value: float
     completion: float = INITIAL_COMPLETION
-    # 完成度上限：无头骑士剑抽到「易碎」时是 70。
-    completion_cap: float = INITIAL_COMPLETION
     turns: int = 0
     last_factor: float | None = None
     guard: bool = False
@@ -477,22 +368,17 @@ class ForgeSession:
     guard_granted: bool = False
     mending: bool = False
     plunder: bool = False
+    sharp: bool = False
+    heal_left: int = 0
+    # 最后一舞：贴上的回合数，以及那 -30 是不是已经扣过了。
+    last_dance: bool = False
+    last_dance_turn: int = 0
+    last_dance_done: bool = False
     fortune: bool = False
     fortune_crits_left: int = 0
     books_used: int = 0
     reforge_left: int = 0
     pending: StrikeResult | None = None
-    # ---- 无头骑士剑专属 ----
-    # 本场诅咒（None = 普通剑，没有诅咒）。
-    curse: str | None = None
-    # 剑身自带经验修补（增加/不变都回完成度）。
-    innate_mending: bool = False
-    # 不接受附魔书。
-    no_books: bool = False
-    # 收工收益上限。
-    reward_cap: float | None = None
-    # 「失衡」累计的失败次数。
-    fails: int = 0
 
 
 class Forge:
@@ -518,8 +404,6 @@ class Forge:
         existing = self.sessions.get(key)
         if existing is not None:
             return {"ok": False, "reason": "busy", "session": existing}
-        if sword.key == "headless" and not headless_available():
-            return {"ok": False, "reason": "expired", "sword": sword}
         if sword.free_if_poor:
             paid, remaining = self.cards.spend_shards_or_free(user, sword.cost)
         else:
@@ -532,29 +416,13 @@ class Forge:
                     "sword": sword,
                 }
             paid = sword.cost
-        curse = self.rng.choice(list(CURSES)) if sword.cursed else None
-        completion_cap = (
-            BRITTLE_COMPLETION_CAP if curse == CURSE_BRITTLE else INITIAL_COMPLETION
-        )
-        # 诅咒·鸩毒：完成度直接拉满 100 起（之后每回合固定 -3）。
-        initial_completion = (
-            INITIAL_COMPLETION if curse == CURSE_POISON
-            else float(sword.initial_completion)
-        )
         self.sessions[key] = ForgeSession(
             sword=sword.key, value=float(sword.initial),
-            completion=min(initial_completion, completion_cap),
-            completion_cap=completion_cap,
-            innate_mending=sword.innate_mending,
-            no_books=sword.no_books,
-            reward_cap=sword.reward_cap,
-            curse=curse,
         )
         log(
             f"[锻造] {user} 开局 {sword.name}，"
-            + ("碎片不够、免费开局" if paid == 0 else f"扣 {paid} 碎片")
+            + ("银币不够、免费开局" if paid == 0 else f"扣 {paid} 银币")
             + f"，剩余 {remaining}"
-            + (f"，本场诅咒【{curse}】" if curse else "")
         )
         return {
             "ok": True,
@@ -564,7 +432,6 @@ class Forge:
             "completion": self.sessions[key].completion,
             "paid": paid,
             "free": paid == 0,
-            "curse": curse,
         }
 
     # ---- 砸 ----
@@ -581,17 +448,12 @@ class Forge:
     def random_uniform(self, low: float, high: float) -> float:
         return self.rng.uniform(low, high)
 
-    def completion_loss(self, sword: str | None = None) -> int:
-        """这一锤失败要掉多少完成度：默认 30~50，无头骑士剑是 20~40。"""
-        bounds = COMPLETION_LOSS
-        if sword:
-            bounds = SWORDS[sword].loss or COMPLETION_LOSS
-        return self.rng.randint(*bounds)
+    def completion_loss(self) -> int:
+        """这一锤失败要掉多少完成度（30~50）。"""
+        return self.rng.randint(*COMPLETION_LOSS)
 
     def crit_chance(self, session: ForgeSession) -> float:
         chance = SWORDS[session.sword].crit_chance
-        if session.curse == CURSE_BACKLASH:
-            chance *= BACKLASH_CRIT_MULTIPLIER
         if session.fortune:
             chance *= FORTUNE_MULTIPLIER
         return min(1.0, chance)
@@ -620,23 +482,7 @@ class Forge:
         outcome = self.pick_outcome(session.sword, turn)
         if outcome == OUTCOME_FAIL:
             # 失败不再扣价值，只扣完成度。
-            # ① 诅咒·鸩毒：失败不掉完成度（每回合那 3 点在 _apply 里扣）。
-            if session.curse == CURSE_POISON:
-                return StrikeResult(
-                    outcome=outcome, value=before, turns=turn,
-                    value_before=before,
-                    completion=before_completion,
-                    completion_before=before_completion,
-                )
-            # ② 诅咒·失衡：这次失败一点完成度都不掉（但累计三次就强制失败）。
-            if session.curse == CURSE_UNBALANCED:
-                return StrikeResult(
-                    outcome=outcome, value=before, turns=turn,
-                    value_before=before, unbalanced=True,
-                    completion=before_completion,
-                    completion_before=before_completion,
-                )
-            # ③ 「保护」附魔：挡下这一次完成度损失，价值当然也不动。
+            # ① 「保护」附魔：挡下这一次完成度损失，价值当然也不动。
             if session.guard:
                 return StrikeResult(
                     outcome=outcome, value=before, turns=turn,
@@ -644,24 +490,8 @@ class Forge:
                     completion=before_completion,
                     completion_before=before_completion,
                 )
-            # ④ 诅咒·畸变：失败反而涨价值 ×1.4，但完成度掉得更狠（30~50）。
-            if session.curse == CURSE_MUTATION:
-                after_completion = max(
-                    0.0, before_completion - self.rng.randint(*MUTATION_LOSS)
-                )
-                return StrikeResult(
-                    outcome=outcome, value=before * MUTATION_VALUE_FACTOR,
-                    turns=turn, value_before=before,
-                    factor=MUTATION_VALUE_FACTOR, mutated=True,
-                    gained=before * MUTATION_VALUE_FACTOR - before,
-                    completion=after_completion,
-                    completion_before=before_completion,
-                    completion_lost=before_completion - after_completion,
-                )
-            # ⑤ 没顶住：掉随机完成度（无头骑士剑 20~40）；掉到 0 或以下剑就崩了。
-            after_completion = max(
-                0.0, before_completion - self.completion_loss(session.sword)
-            )
+            # ② 没顶住：掉随机完成度（30~50）；掉到 0 或以下剑就崩了。
+            after_completion = max(0.0, before_completion - self.completion_loss())
             return StrikeResult(
                 outcome=outcome, value=before, turns=turn,
                 value_before=before,
@@ -684,8 +514,7 @@ class Forge:
             return StrikeResult(
                 outcome=outcome, value=value, turns=turn, value_before=before,
                 factor=factor, gained=value - before, plunder=plunder,
-                mending=session.mending or session.innate_mending,
-                innate_mending=session.innate_mending,
+                mending=session.mending,
                 completion=after_completion,
                 completion_before=before_completion,
                 completion_gained=after_completion - before_completion,
@@ -694,18 +523,20 @@ class Forge:
         # 没中就用剑的普通倍率（下界合金剑是 1.6~1.8）。
         crit = reforge_crit or self.crit_hit(session)
         lo, hi = CRIT_FACTOR if crit else sword.factor
-        # 诅咒·贪饕：增加固定 ×1.1，暴击固定 ×10（都不掷骰子）。
-        if session.curse == CURSE_GLUTTONY:
-            lo = hi = GLUTTONY_CRIT_FACTOR if crit else GLUTTONY_FACTOR
+        # 「锋利」：本局的普通增加固定吃剑的最大倍率（暴击还是走 1.8~2.3）。
+        if session.sharp and not crit:
+            lo = hi = sword.factor[1]
         # 上下限一样时（剑本身的固定倍率）不掷骰子，结果就是那个固定倍率。
         factor = lo if lo == hi else round(self.random_uniform(lo, hi), 4)
         after_completion = self._completion_after_mending(
             before_completion, session, success=True
         )
-        # 诅咒·反噬：暴击时完成度反过来 -5（这次不再 +5）。
-        backlash = crit and session.curse == CURSE_BACKLASH
-        if backlash:
-            after_completion = max(0.0, before_completion - BACKLASH_LOSS)
+        # 「治愈」：暴击时额外回 15 完成度，一局最多两次。
+        healed = crit and session.heal_left > 0
+        if healed:
+            after_completion = min(
+                INITIAL_COMPLETION, after_completion + HEAL_RECOVER
+            )
         return StrikeResult(
             outcome=outcome,
             value=before * factor,
@@ -716,9 +547,9 @@ class Forge:
             crit=crit,
             reforge_crit=crit and reforge_crit,
             fortune_crit=crit and session.fortune,
-            mending=session.mending or session.innate_mending,
-            innate_mending=session.innate_mending,
-            backlash=backlash,
+            mending=session.mending,
+            healed=healed,
+            heal_left=max(0, session.heal_left - 1) if healed else session.heal_left,
             completion=after_completion,
             completion_before=before_completion,
             completion_gained=after_completion - before_completion,
@@ -730,22 +561,14 @@ class Forge:
         """这一锤之后的完成度。
 
         没贴「经验修补」：成功 +3、不变 +0。
-        贴了「经验修补」（或无头骑士剑这种剑身自带的）：**「增加」或「不变」都只回
-        5 点**（成功时那 5 点取代基础的 3 点，不是 3+5）。
-        抽到诅咒·永生时：增加/不变都回 **15 点**（取代上面那 5 点）。
-        抽到诅咒·鸩毒时：一点都不回（每回合那 3 点在 ``_apply`` 里另扣）。
-        上限是这局自己的 ``completion_cap``（抽到「易碎」时只有 70）。
+        贴了「经验修补」：**「增加」或「不变」都只回 5 点**（成功时那 5 点取代
+        基础的 3 点，不是 3+5）。上限是 100。
         """
-        if session.curse == CURSE_POISON:
-            return before
-        if session.curse == CURSE_IMMORTAL:
-            # 诅咒·永生：增加/不变都回 10 点（取代剑身自带的 5 点）。
-            gained = IMMORTAL_MENDING_RECOVER
-        elif session.mending or session.innate_mending:
+        if session.mending:
             gained = MENDING_RECOVER
         else:
             gained = COMPLETION_RECOVER if success else 0.0
-        return min(session.completion_cap, before + gained)
+        return min(INITIAL_COMPLETION, before + gained)
 
     def _apply(self, session: ForgeSession, result: StrikeResult) -> None:
         """把这一锤落到局里，并结算这一锤真正用掉的附魔。"""
@@ -753,18 +576,6 @@ class Forge:
         session.completion = result.completion
         session.turns = result.turns
         session.last_factor = result.factor
-        # 诅咒·鸩毒：不管成败，每回合固定啃掉 3 点完成度。
-        if session.curse == CURSE_POISON:
-            poisoned = max(0.0, session.completion - POISON_TURN_LOSS)
-            result.completion_lost = session.completion - poisoned
-            result.completion_gained = -result.completion_lost
-            session.completion = poisoned
-            result.completion = poisoned
-            result.poisoned = True
-        # 诅咒·失衡：失败不掉完成度，但次数照记。
-        if result.unbalanced:
-            session.fails += 1
-            result.fails = session.fails
         if result.guarded:
             session.guard = False
         # 时运：每暴击一次扣一次，扣完就失效。
@@ -773,6 +584,25 @@ class Forge:
             if session.fortune_crits_left <= 0:
                 session.fortune = False
                 session.fortune_crits_left = 0
+        # 治愈：吃一次额外回复就少一次。
+        if result.healed:
+            session.heal_left = result.heal_left
+        # 最后一舞：贴书上满三回合就扣 30 完成度（一局只扣一次）。
+        if (
+            session.last_dance
+            and not session.last_dance_done
+            and session.turns >= session.last_dance_turn + LAST_DANCE_TURNS
+        ):
+            before_dance = session.completion
+            session.completion = max(0.0, before_dance - LAST_DANCE_LOSS)
+            result.completion = session.completion
+            result.completion_lost += before_dance - session.completion
+            result.dance_drop = True
+            session.last_dance_done = True
+            log(
+                f"[锻造] 最后一舞到期：完成度 -{completion_text(LAST_DANCE_LOSS)}"
+                f" → {completion_text(session.completion)}%"
+            )
         self._maybe_grant_guard(session)
 
     def _maybe_grant_guard(self, session: ForgeSession) -> None:
@@ -786,74 +616,37 @@ class Forge:
             session.guard_granted = True
             log(f"[锻造] 「保护」到账：下一次失败不减少完成度")
 
-    # ---- 结算（收工 / 诅咒强制收工共用） ----
+    # ---- 结算 ----
     def _settle(self, key: tuple[str, str], session: ForgeSession,
                 username: str = "") -> dict:
-        """算最终价值与收益、发碎片、记排行榜；返回结算摘要。
-
-        诅咒·易碎的 ×1.6 乘在**最终收益**上（不是价值）：
-        ``收益 = 1.8 × 完成度/100 × K × ln(1 + 价值/K)``，
-        所以 ``value`` 记的还是剑本身的价值，排行榜也按这个原始价值记。
-        收益封顶同样在这里落地。
-        """
+        """算最终价值与收益、发银币、记排行榜；返回结算摘要。"""
         user = key[1]
         value = float(session.value)
-        brittle = session.curse == CURSE_BRITTLE
         completion = max(0.0, session.completion)
         reward = reward_for(value, completion)
-        if brittle:
-            reward = round(reward * BRITTLE_REWARD_FACTOR)
-        capped = False
-        if session.reward_cap is not None and reward > session.reward_cap:
-            reward = int(session.reward_cap)
-            capped = True
+        # 最后一舞：三回合那 30 点还没扣就收工 → 收益减半。
+        halved = session.last_dance and not session.last_dance_done
+        if halved:
+            reward = int(round(reward * LAST_DANCE_PENALTY))
         total = self.cards.grant_shards(user, reward)
         sword_name = SWORDS[session.sword].name
-        if capped:
-            # 封顶后的收益是硬数字，别再让排行榜按公式重算回去。
+        if halved:
+            # 减半后的收益是硬数字，别再让排行榜按公式重算回去。
             rank = self.rank.record(reward, user, username, sword=sword_name)
         else:
             rank = self.rank.record(
                 reward, user, username,
                 forge_value=value, completion=completion,
-                reward_factor=BRITTLE_REWARD_FACTOR if brittle else None,
                 sword=sword_name,
             )
         return {
             "value": value,
             "completion": completion,
             "reward": reward,
-            "capped": capped,
-            "brittle": brittle,
+            "halved": halved,
             "shards": total,
             "rank": rank,
         }
-
-    def _settle_curse(self, key: tuple[str, str], session: ForgeSession,
-                      result: StrikeResult, username: str = "") -> None:
-        """诅咒的强制结算：永生满完成度自动收工、失衡三次失败强制毁剑。"""
-        if session.curse == CURSE_UNBALANCED and session.fails >= UNBALANCED_MAX_FAILS:
-            result.forced_fail = True
-            del self.sessions[key]
-            log(
-                f"[锻造] {key[1]} 诅咒【失衡】失败满 "
-                f"{UNBALANCED_MAX_FAILS} 次，锻造强制失败。"
-            )
-            return
-        if (
-            session.curse == CURSE_IMMORTAL
-            and session.completion >= session.completion_cap
-        ):
-            del self.sessions[key]
-            settled = self._settle(key, session, username)
-            result.forced_end = True
-            result.reward = settled["reward"]
-            result.shards = settled["shards"]
-            log(
-                f"[锻造] {key[1]} 诅咒【永生】生效，完成度满 "
-                f"{completion_text(session.completion)}%，强制收工 → "
-                f"{settled['reward']} 碎片"
-            )
 
     def _commit_pending(self, key: tuple[str, str],
                         session: ForgeSession,
@@ -870,8 +663,6 @@ class Forge:
         if result.ruined:
             del self.sessions[key]
             log(f"[锻造] {key[1]} 第 {result.turns} 回合完成度归零（挂起的一锤被认下）")
-        else:
-            self._settle_curse(key, session, result, username)
         return result
 
     def settle_pending(self, group: str, user: str) -> StrikeResult | None:
@@ -890,9 +681,7 @@ class Forge:
         if session is None:
             return None
         settled = self._commit_pending(key, session, username)
-        if settled is not None and (
-            settled.ruined or settled.forced_end or settled.forced_fail
-        ):
+        if settled is not None and settled.ruined:
             return settled
         result = self._roll_strike(
             session, session.turns + 1, reforge_crit=session.reforge_left > 0
@@ -906,11 +695,6 @@ class Forge:
         if result.failed:
             if result.guarded:
                 log(f"[锻造] {user} 「保护」附魔生效，完成度保持 {result.completion:.0f}")
-            elif result.unbalanced:
-                log(
-                    f"[锻造] {user} 诅咒【失衡】吃下第 {result.fails} 次失败，"
-                    f"完成度保持 {result.completion:.0f}"
-                )
             elif not result.ruined:
                 log(
                     f"[锻造] {user} 锻造失败：完成度 "
@@ -922,8 +706,6 @@ class Forge:
                 f"[锻造] {user} 第 {result.turns} 回合完成度归零，剑彻底崩了"
                 f"（{SWORDS[session.sword].name}）"
             )
-        else:
-            self._settle_curse(key, session, result, username)
         return result
 
     def strike_many(self, group: str, user: str, count: int,
@@ -959,8 +741,6 @@ class Forge:
         if result.ruined:
             del self.sessions[key]
             log(f"[锻造] {key[1]} 第 {result.turns} 回合完成度归零（重构用尽）")
-        else:
-            self._settle_curse(key, session, result, username)
         return {"ok": True, "result": result, "left": 0}
 
     def reforge(self, group: str, user: str, username: str = "") -> dict:
@@ -981,12 +761,6 @@ class Forge:
         session = self.sessions.get(key)
         if session is None:
             return {"ok": False, "reason": "no_forge"}
-        # 无头骑士剑不接受附魔书：书不扣，次数也不占。
-        if session.no_books:
-            return {
-                "ok": False, "reason": "no_enchant", "name": name,
-                "sword": SWORDS[session.sword].name,
-            }
         if name not in BOOK_NAMES:
             return {"ok": False, "reason": "unknown", "name": name}
         # 别的书要先让挂着的那一锤落定，效果才落得下去。
@@ -1045,6 +819,9 @@ class Forge:
             }
         already = {
             ENCHANT_MENDING: session.mending,
+            ENCHANT_SHARP: session.sharp,
+            ENCHANT_HEAL: session.heal_left > 0,
+            ENCHANT_LAST_DANCE: session.last_dance,
             ENCHANT_FORTUNE: session.fortune,
             ENCHANT_GUARD: session.guard_book or session.guard_granted,
             ENCHANT_PLUNDER: session.plunder,
@@ -1056,6 +833,18 @@ class Forge:
         session.books_used += 1
         if name == ENCHANT_MENDING:
             session.mending = True
+        elif name == ENCHANT_SHARP:
+            session.sharp = True
+        elif name == ENCHANT_HEAL:
+            session.heal_left = HEAL_CHARGES
+        elif name == ENCHANT_LAST_DANCE:
+            # 立刻涨 30 完成度，三回合后那 30 点会扣回去（见 ``_apply``）。
+            session.last_dance = True
+            session.last_dance_turn = session.turns
+            session.last_dance_done = False
+            session.completion = min(
+                INITIAL_COMPLETION, session.completion + LAST_DANCE_GAIN
+            )
         elif name == ENCHANT_FORTUNE:
             session.fortune = True
             session.fortune_crits_left = FORTUNE_CRITS
@@ -1072,12 +861,15 @@ class Forge:
             "ok": True, "action": "arm", "book": name,
             "effect": BOOK_EFFECTS[name],
             "guard_ready": session.guard,
+            "completion": session.completion,
+            "heal_left": session.heal_left,
+            "dance_turns": LAST_DANCE_TURNS,
             "books_left": MAX_BOOKS_PER_FORGE - session.books_used,
             "max": MAX_BOOKS_PER_FORGE,
         }
 
     def end_forge(self, group: str, user: str, username: str = "") -> dict | None:
-        """收工：砸满 3 回合后按 ``reward_for(价值, 完成度)`` 发碎片，并记排行榜。"""
+        """收工：砸满 3 回合后按 ``reward_for(价值, 完成度)`` 发银币，并记排行榜。"""
         key = (group, user)
         session = self.sessions.get(key)
         if session is None:
@@ -1085,12 +877,6 @@ class Forge:
         settled = self._commit_pending(key, session, username)
         if settled is not None and settled.ruined:
             return {"ok": False, "reason": "broken"}
-        if settled is not None and settled.forced_end:
-            return {
-                "ok": False, "reason": "forced_end", "reward": settled.reward,
-            }
-        if settled is not None and settled.forced_fail:
-            return {"ok": False, "reason": "forced_fail"}
         if session.turns < FORGE_MIN_TURNS:
             return {
                 "ok": False,
@@ -1098,16 +884,15 @@ class Forge:
                 "turns": session.turns,
                 "need": FORGE_MIN_TURNS,
             }
-        # 先摘局再发碎片：中途出错也不会“领两次”或“局还挂着”。
+        # 先摘局再发银币：中途出错也不会“领两次”或“局还挂着”。
         del self.sessions[key]
         sword = SWORDS[session.sword]
         done = self._settle(key, session, username)
         log(
             f"[锻造] {user} 收工 {sword.name}，价值 {session.value:.2f}、"
-            f"完成度 {completion_text(done['completion'])}% → {done['reward']} 碎片，"
+            f"完成度 {completion_text(done['completion'])}% → {done['reward']} 银币，"
             f"共 {done['shards']}"
-            + ("（收益封顶）" if done["capped"] else "")
-            + (f"，排行榜第 {done['rank']} 名" if done["rank"] else "")
+            + (f"，排行榜第 {done['rank']} 名" if done['rank'] else "")
         )
         return {
             "ok": True,
@@ -1118,9 +903,7 @@ class Forge:
             "turns": session.turns,
             "shards": done["shards"],
             "rank": done["rank"],
-            "brittle": done["brittle"],
-            "capped": done["capped"],
-            "curse": session.curse,
+            "halved": done["halved"],
         }
 
     def clear(self) -> None:
@@ -1136,7 +919,7 @@ class Forge:
 def sword_list_text() -> str:
     return (
         "要锻造哪把？"
-        + " / ".join(f"{s.name}（{s.cost} 奶龙碎片）" for s in buyable_now())
+        + " / ".join(f"{s.name}（{s.cost} 银币）" for s in BUYABLE_SWORDS)
         + "。照「锻造 石剑」这样发就行。"
     )
 
@@ -1153,27 +936,18 @@ def start_text(result: dict, sword: Sword) -> str:
     if result.get("ok"):
         if result.get("free"):
             cost = (
-                f"你连 {sword.cost} 碎片都没有……行吧，这次算我请你，"
-                f"不扣碎片，还剩 {result['shards']}。"
+                f"你连 {sword.cost} 银币都没有……行吧，这次算我请你，"
+                f"不扣银币，还剩 {result['shards']}。"
             )
         else:
-            cost = f"还剩 {result['shards']} 奶龙碎片。"
+            cost = f"还剩 {result['shards']} 银币。"
         lo, hi = sword.factor
         head = (
             f"喏，{sword.name}架好了，初始价值 {sword.initial}。"
             f"{cost}"
             f"砸一次价值涨到 {lo}~{hi} 倍。"
         )
-        # 鸩毒把完成度拉满 100，所以看开局结果而不是剑的默认值。
-        started_completion = result.get("completion", sword.initial_completion)
-        if started_completion < INITIAL_COMPLETION:
-            head += f"初始完成度 {completion_text(started_completion)}%，小心点。"
-        curse = result.get("curse")
-        if curse:
-            head += f"\n本场诅咒【{curse}】：{CURSE_EFFECTS[curse]}。"
         return head
-    if result["reason"] == "expired":
-        return "无头骑士剑是限时活动，现在不开放 —— 先去锻造石剑/铁剑/钻石剑吧。"
     if result["reason"] == "busy":
         return (
             "你这把剑还没收工呢，急什么？"
@@ -1181,7 +955,7 @@ def start_text(result: dict, sword: Sword) -> str:
             + "接着喊「用力砸」就行。"
         )
     return (
-        f"锻造{sword.name}要 {sword.cost} 奶龙碎片，你手里只有 {result['shards']}。"
+        f"锻造{sword.name}要 {sword.cost} 银币，你手里只有 {result['shards']}。"
         "先去签到抽卡攒点吧。"
     )
 
@@ -1200,31 +974,15 @@ def books_text(owned: dict[str, int] | None = None) -> str:
 def broken_text() -> str:
     return (
         "唔，不改了？那就这样吧——完成度已经归零，"
-        "碎片一个都拿不回来。想再来一局就发「锻造 石剑」。"
+        "银币一个都拿不回来。想再来一局就发「锻造 石剑」。"
     )
 
 
 def strike_text(result: StrikeResult) -> str:
     lines = [pick_crit_flavor() if result.crit else pick_flavor()]
     completion = completion_text(result.completion)
-    if result.ruined and not result.failed:
-        lines.append(
-            "完成度被诅咒啃光了……剑彻底崩了，这局废了，碎片不退。"
-            f"（第 {result.turns} 回合）"
-        )
-    elif result.failed:
-        if result.forced_fail:
-            lines.append(
-                f"哐——！这是第三次失败了……诅咒【失衡】生效，"
-                f"剑当场报废，碎片不退。（第 {result.turns} 回合）"
-            )
-        elif result.unbalanced:
-            lines.append(
-                f"哐——！剑身裂了……诅咒【失衡】生效，完成度 {completion}%，"
-                f"（已失败 {result.fails}/{UNBALANCED_MAX_FAILS} 次"
-                f"）。（第 {result.turns} 回合）"
-            )
-        elif result.guarded:
+    if result.failed:
+        if result.guarded:
             lines.append(
                 f"Anubis逆转了死亡的流沙————「保护」生效。这一锤完成度不变，还是 {completion}%，"
                 f"价值 {round(result.value)}。（第 {result.turns} 回合）"
@@ -1232,7 +990,7 @@ def strike_text(result: StrikeResult) -> str:
         elif result.destroyed:
             lines.append(
                 f"哐——！剑身彻底崩了……完成度归零，第 {result.turns} 回合，"
-                "这局废了，碎片不退。"
+                "这局废了，银币不退。"
             )
         elif result.deferred:
             lines.append(
@@ -1271,28 +1029,22 @@ def strike_text(result: StrikeResult) -> str:
     if result.fortune_crit:
         lines.append("（附魔书·时运生效）")
     if result.mending and result.completion_gained > 0:
+        lines.append("（附魔书·经验修补生效）")
+    if result.healed:
+        left = int(result.heal_left)
         lines.append(
-            "（无头骑士剑·经验修补生效）" if result.innate_mending
-            else "（附魔书·经验修补生效）"
+            f"（附魔书·治愈生效：完成度 +{completion_text(HEAL_RECOVER)}，"
+            + (f"还能生效 {left} 次）" if left > 0 else "本局已用尽）")
         )
     if result.plunder:
         lines.append("（附魔书·掠夺生效）")
-    if result.backlash:
+    if result.dance_drop:
         lines.append(
-            f"（诅咒·反噬生效：完成度 -{completion_text(BACKLASH_LOSS)}）"
+            f"（最后一舞：{LAST_DANCE_TURNS} 回合到，完成度 -"
+            f"{completion_text(LAST_DANCE_LOSS)}）"
         )
-    if result.mutated:
-        lines.append(
-            f"（诅咒·畸变生效：失败也涨价值 ×{MUTATION_VALUE_FACTOR}）"
-        )
-    if result.poisoned:
-        lines.append(
-            f"（诅咒·鸩毒生效：完成度 -{completion_text(POISON_TURN_LOSS)}）"
-        )
-    if result.forced_end:
-        lines.append(
-            f"（诅咒·永生生效：完成度满了，强制收工 → {result.reward} 奶龙碎片）"
-        )
+        if result.ruined:
+            lines.append("完成度归零，剑彻底崩了……这局废了，银币不退。")
     if result.deferred:
         lines.append(
             "（附魔书·重构就绪：这回合必暴击，"
@@ -1315,13 +1067,6 @@ def strike_batch_text(results: list[StrikeResult]) -> str:
             gained = 0
             if result.guarded:
                 extra = "（保护生效，完成度没掉）"
-            elif result.forced_fail:
-                extra = "（诅咒·失衡：第三次失败，剑碎了）"
-            elif result.unbalanced:
-                extra = (
-                    "（诅咒·失衡：完成度不降，已失败 "
-                    f"{result.fails}/{UNBALANCED_MAX_FAILS} 次）"
-                )
             elif result.ruined:
                 extra = "（锻造失败，剑碎了）"
             else:
@@ -1336,17 +1081,23 @@ def strike_batch_text(results: list[StrikeResult]) -> str:
                 extra = "（暴击）"
             if result.plunder:
                 extra = "（掠夺生效）"
+        if result.healed:
+            extra += f"（治愈 +{completion_text(HEAL_RECOVER)}）"
+        if result.dance_drop:
+            if result.failed:
+                # completion_lost 已经把这一锤和最后一舞一起算进去了，别写两遍。
+                extra = (
+                    "（锻造失败 + 最后一舞到期，完成度 -"
+                    f"{completion_text(result.completion_lost)}）"
+                )
+            else:
+                extra += f"（最后一舞 -{completion_text(LAST_DANCE_LOSS)}）"
         lines.append(
             f"已进行 {turn} 次锻造，现在价值 {round(result.value)}，"
             f"该回合增加 {gained}，完成度 {completion}%{extra}。（第 {turn} 回合）"
         )
-    if results and results[-1].forced_end:
-        lines.append(
-            "（诅咒·永生生效：完成度满了，强制收工 → "
-            f"{results[-1].reward} 奶龙碎片）"
-        )
-    elif results and results[-1].ruined:
-        lines.append("哐——！剑身彻底崩了……这局废了，碎片不退。")
+    if results and results[-1].ruined:
+        lines.append("哐——！剑身彻底崩了……这局废了，银币不退。")
     elif results and results[-1].deferred:
         lines.append(
             "（附魔书·重构就绪：想重掷就发「重构」，"
@@ -1361,11 +1112,6 @@ def book_text(result: dict, book: str, owned: dict[str, int] | None = None) -> s
         reason = result.get("reason")
         if reason == "broken":
             return broken_text()
-        if reason == "no_enchant":
-            return (
-                f"{result.get('sword') or '这把剑'}不接受附魔书 —— "
-                "书我原样还你，也没占这一局的次数。"
-            )
         if reason == "limit":
             need = int(result.get("need") or 1)
             left = int(result.get("books_left") or 0)
@@ -1387,7 +1133,7 @@ def book_text(result: dict, book: str, owned: dict[str, int] | None = None) -> s
             return (
                 f"你手里没有「{book}」这本附魔书，别拿空气糊弄我。"
                 + owned_line
-                + f"开箱有 {CARD_BOX_BOOK_PROBABILITY:.0%} 概率开出来，去开箱子吧。"
+                + "开箱现在不出附魔书了，这本暂时弄不到。"
             )
         if reason == "already":
             if book == ENCHANT_UPGRADE:
@@ -1416,6 +1162,19 @@ def book_text(result: dict, book: str, owned: dict[str, int] | None = None) -> s
         )
     elif book == ENCHANT_GUARD and not result.get("guard_ready"):
         tail = "「保护」贴上了：砸满 3 回合后自动到账，下一次失败不减少完成度。（一局一次）"
+    elif book == ENCHANT_LAST_DANCE:
+        turns = int(result.get("dance_turns") or LAST_DANCE_TURNS)
+        tail = (
+            f"「最后一舞」贴上了：完成度立刻 +{completion_text(LAST_DANCE_GAIN)}"
+            f"（现在 {completion_text(float(result.get('completion') or 0))}%），"
+            f"{turns} 回合后会扣回 {completion_text(LAST_DANCE_LOSS)}；"
+            "那之前收工的话收益减半。"
+        )
+    elif book == ENCHANT_HEAL:
+        tail = (
+            f"「治愈」贴上了：之后每次暴击额外回 {completion_text(HEAL_RECOVER)} 完成度，"
+            f"最多 {HEAL_CHARGES} 次。"
+        )
     else:
         tail = f"「{book}」贴上了：{result['effect']}。"
     quota = f"本次锻造剩余附魔书次数：{result['books_left']}/{result['max']}"
@@ -1446,15 +1205,6 @@ def end_text(result: dict | None, username: str = "") -> str:
         reason = result.get("reason")
         if reason == "broken":
             return broken_text()
-        if reason == "forced_fail":
-            return (
-                "诅咒【失衡】生效：锻造失败。"
-            )
-        if reason == "forced_end":
-            return (
-                "诅咒【永生】已经替你收工了：完成度一满就自动结算，"
-                f"{result.get('reward', 0)} 奶龙碎片已经到账。"
-            )
         if reason == "early":
             left = result["need"] - result["turns"]
             return f"才砸 {result['turns']} 次就想收工？再砸 {left} 次再说。"
@@ -1463,23 +1213,22 @@ def end_text(result: dict | None, username: str = "") -> str:
         f"\n这局收益上了锻造排行榜第 {result['rank']} 名！"
         if result.get("rank") else ""
     )
-    curse_line = ""
-    if result.get("brittle"):
-        curse_line = "\n（诅咒·易碎生效：最终收益 ×1.6）"
-    if result.get("capped"):
-        curse_line += f"\n（收益触到上限，只发 {result['reward']} 碎片）"
+    dance_line = (
+        f"\n（最后一舞：没撑到 {LAST_DANCE_TURNS} 回合就收工，收益减半）"
+        if result.get("halved") else ""
+    )
     return (
         f"收工！{result['sword'].name}价值 {round(result['value'])}、完成度 "
-        f"{completion_text(result['completion'])}% → {result['reward']} 奶龙碎片，"
+        f"{completion_text(result['completion'])}% → {result['reward']} 银币，"
         f"现在共有 {result['shards']}。"
         f"{username}，下次想砸再喊我。"
-        + curse_line
+        + dance_line
         + rank_line
     )
 
 
 def rank_text(records: list[dict]) -> str:
-    """排行榜渲染失败时的文字版：固定十行，名次/收益/剑/人/时间。"""
+    """排行榜渲染失败时的文字版：固定十行，名次/收益/人/时间/类型（跟图一致）。"""
     lines = ["锻造排行榜（锻造收益最高的十次）"]
     for index in range(TOP_N):
         rank = ordinal(index + 1)
@@ -1489,7 +1238,7 @@ def rank_text(records: list[dict]) -> str:
             sword = str(item.get("sword") or "").strip() or "—"
             lines.append(
                 f"{rank}  {int(item.get('value') or 0):,}  "
-                f"{sword}  {name}  {item.get('time') or '—'}"
+                f"{name}  {item.get('time') or '—'}  {sword}"
             )
         else:
             lines.append(f"{rank}  —  虚位以待  —")

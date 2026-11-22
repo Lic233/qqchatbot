@@ -30,20 +30,59 @@ from .forge import (
     parse_book,
     parse_strike,
     parse_sword,
-    rank_text,
     reforge_text,
     start_text,
     strike_batch_text,
     strike_text,
     sword_list_text,
 )
+from .forge_new import (
+    PANEL_PREFIX as FORGE_NEW_COMMAND,
+    NewForge,
+    leaderboard_text as forge_new_leaderboard_text,
+    parse_panel_data,
+)
 from .forge_rank import ForgeRank, is_rank_command
+from .panel import BUTTON_TEST_COMMAND, build_rows
+from .pet import (
+    ACTIONS,
+    BUTTONS_PER_ROW,
+    COMMAND_PANEL,
+    COMMAND_PREFIX,
+    EAT_GIF,
+    FOODS,
+    PLAY_GIF,
+    GROUPS,
+    MAX_LEVEL,
+    Pets,
+    chatter,
+    duration_text,
+    eat_text,
+    exp_need,
+    group_markdown,
+    panel_markdown,
+    settle_summary,
+    status_line,
+    switch_text,
+)
+from .pet_card import render_pet_card
 from .videosum import (
     BiliClient,
     BiliBlocked,
     find_video_link,
     load_cookie,
     review_prompt,
+)
+from .voice import (
+    VOICE_USAGE,
+    VoiceError,
+    can_switch_voice,
+    models_text,
+    split_for_voice,
+    switch_model,
+    synthesize,
+    tts_payload,
+    voice_model_payload,
 )
 
 try:  # Pillow 是可选依赖：没装就只发文字版
@@ -64,9 +103,31 @@ VIDEO_INTENT_WORDS = (
 )
 
 
+# 旧锻造系统（forge.py：石剑 / 铁剑 / 钻石剑、用力砸、附魔书）的入口开关。
+# 2026-11-19 换成新锻造系统（forge_new.py，按钮面板）后，入口关掉了：
+# 「锻造 石剑」「用力砸」「结束锻造」「附魔」「重构」这些旧命令现在**完全没反应**
+# （不回复、也不抢 AI），但 forge.py 和 _handle_forge 都原样留着 ——
+# 想恢复就把这个开关改成 True（新系统的「锻造」优先级更高，会先匹配）。
+LEGACY_FORGE_ENABLED = False
+
+
 def wants_video_comment(text: str) -> bool:
     text = (text or "").strip()
     return bool(text) and any(word in text for word in VIDEO_INTENT_WORDS)
+
+
+def points_at_recent_video(text: str) -> bool:
+    """这句是在指「刚才群里那个视频」吗？
+
+    只在**复用群里旧链接/旧卡片**时才问这个问题：光有「总结 / 看看」不够 ——
+    实测踩过，先转了条链接，过几分钟有人聊别的：「和原神对比一下，总结哪个
+    更好玩」，也被当成要看视频，回一句「这个链接我没认出来」。所以再加两条：
+    句子里提到「视频」，或者短到像是专门在指刚才那条（「看看这个」「总结一下」）。
+    """
+    text = (text or "").strip()
+    if not wants_video_comment(text):
+        return False
+    return "视频" in text or len(text) <= 12
 
 
 class Handler:
@@ -79,6 +140,8 @@ class Handler:
         self.records = self._load_records()
         self.last_images: dict[str, ImageRef] = {}
         self.last_image_at: dict[str, float] = {}
+        # 上次换嗓子的时间：换一次要重载模型，用它做全局冷却（0 表示还没换过）。
+        self.last_voice_switch: float = 0.0
         # 每个群上一条消息，用来判断「同一句话连发两次」要不要复读（+1）。
         self.last_messages: dict[str, str] = {}
         # 机器人自己的名字（启动后从 /users/@me 取），用来剥掉正文开头的「名字 + 空格」。
@@ -117,7 +180,10 @@ class Handler:
         self.cards = Cards(self.paths.data)
         self.cs = CS()
         self.forge_rank = ForgeRank(self.paths.data / "forge_rank.json")
+        # 新锻造系统（按钮面板）；旧的 Forge 留着，只是入口关了（见 LEGACY_FORGE_ENABLED）
+        self.forge_new = NewForge(self.cards, self.forge_rank)
         self.forge = Forge(self.cards, self.forge_rank)
+        self.pets = Pets(self.paths.data, lambda: self.cards)
         self.attendance = Attendance(self.paths.data)
         self.roster = Roster(self.paths.data)
         self.profiles = Profiles(self.paths.data)
@@ -193,6 +259,10 @@ class Handler:
         # 但 Handler 也可能被自检/其它来源直接调用，这里兜底保证命令干净。
         command = normalize_content(event.content)
 
+        # 顺手看一眼这个人的宠物有没有快趴窝（任一属性低于 10 就顶一句）。
+        # 走被动回复挂在当前这条消息上，不吃主动消息配额。
+        await self._maybe_warn_pet(event)
+
         # 顺手记下这个群的 B站链接（不管有没有 @ 我）：实测的真实用法是先转发
         # 链接、再单独 @ 一句「看看这个」，那时候正文里已经没有链接了。
         video_link = find_video_link(command) or event.attached_url
@@ -237,6 +307,19 @@ class Handler:
             await self._handle_docs(command, event)
             return True
 
+        # 按钮测试：临时入口，验证「发按钮 → 点击 → 回调」整条链路
+        if command.startswith(BUTTON_TEST_COMMAND):
+            await self._handle_button_test(command, event)
+            return True
+
+        # 换嗓子：「语音模型」看列表，「语音模型 铃兰」直接换
+        if await self._handle_voice_model(command, event):
+            return True
+
+        # 发语音：`语音 你好` 把后面的内容念出来
+        if await self._handle_voice(command, event):
+            return True
+
         # 保存老婆（可带名字）
         if command == "保存老婆" or command.startswith("保存老婆"):
             await self._handle_save_wife(command, event)
@@ -272,13 +355,26 @@ class Handler:
                 await self._handle_cs(results=True, event=event)
                 return True
 
-        # 锻造 / 附魔 / 重构 / 排行榜。日常词（用力砸、收工、重构）只在真有局时
-        # 才算命令，所以 _handle_forge 内部会再看一次 active session。
+        # 锻造：新系统（「锻造」开面板，之后全靠按钮）+ 排行榜。
+        # 旧系统（锻造 石剑 / 用力砸 / 结束锻造 / 附魔 / 重构）入口已关，
+        # 这些词现在不再命中任何规则 —— 完全没反应，也不会掉进 AI 闲聊。
+        if await self._handle_forge_new(command, event):
+            return True
+        if LEGACY_FORGE_ENABLED:
+            for candidate in (
+                command,
+                self._strip_leading_name(command) if command else None,
+            ):
+                if candidate and await self._handle_forge(candidate, event):
+                    return True
+
+        # 宠物：面板 / 发呆 / 工作 / 学习 / 吃饭。面板按钮的 data 就是这套命令，
+        # 所以点击和打字走的是同一条路（见 net._handle_interaction）。
         for candidate in (
             command,
             self._strip_leading_name(command) if command else None,
         ):
-            if candidate and await self._handle_forge(candidate, event):
+            if candidate and await self._handle_pet(candidate, event):
                 return True
 
         # 实测：@ 的位置有时会留下机器人自己的名字（日志里出现过
@@ -304,8 +400,76 @@ class Handler:
             return True
         return False
 
+    async def _handle_forge_new(self, command: str, event: Incoming) -> bool:
+        """新锻造系统：「锻造」开局面板，之后只认面板按钮的 data。
+
+        旧系统那套文字命令（「锻造 石剑」「用力砸」「结束锻造」「附魔」
+        「重构」）入口已经关了，这里一个字都不认 —— 匹配条件卡得很死：
+        要么正好是「锻造」，要么是按钮 data（「锻造 <id> <seq> <动作>」）。
+        """
+        text = (command or "").strip()
+        group, user = event.group_openid, event.user_openid
+        # @ 之后偶尔会残留机器人名字，剥掉再试一次（按钮 data 本来就不带名字）
+        candidates = [text] if text else []
+        variant = self._strip_leading_name(text) if text else None
+        if variant and variant != text:
+            candidates.append(variant)
+        for candidate in candidates:
+            if is_rank_command(candidate):
+                await self._send_forge_rank(event)
+                return True
+            if candidate == FORGE_NEW_COMMAND:
+                result = self.forge_new.start(group, user, self._forge_owner(event))
+                await self._deliver_forge(result, event)
+                return True
+            parsed = parse_panel_data(candidate)
+            if parsed is None:
+                continue
+            forge_id, seq, action, argument = parsed
+            result = self.forge_new.act(group, user, forge_id, seq, action, argument)
+            await self._deliver_forge(result, event)
+            return True
+        return False
+
+    def _forge_owner(self, event: Incoming) -> str:
+        """锻造人名字：按钮事件里没有昵称，只能拿 openid 去名册反查。"""
+        return (
+            event.username
+            or self.roster.name_of(event.group_openid, event.user_openid)
+            or "群友"
+        ).strip()
+
+    async def _deliver_forge(self, result: dict, event: Incoming) -> None:
+        """发面板（带按钮）或一句纯文字；按钮发不出去就退回文字版。"""
+        group = event.group_openid
+        panel = result.get("panel")
+        if not panel:
+            reply = str(result.get("reply") or "")
+            if reply:
+                await self.sender.text(group, reply, event.msg_id)
+            return
+        allowed = [event.user_openid] if event.user_openid else []
+        try:
+            await self.sender.panel(
+                group, panel["text"],
+                build_rows(panel["rows"], highlight=True, user_ids=allowed),
+                event.msg_id,
+            )
+        except Exception as error:  # noqa: BLE001 - 按钮是附加能力，不能挡住流程
+            log(f"[锻造] 按钮面板发送失败，退回文字：{error!r}")
+            await self.sender.text(
+                group,
+                panel["text"]
+                + "\n\n（按钮发不出去，只能先把面板当文字看；"
+                "检查一下机器人有没有按钮权限。）",
+                event.msg_id,
+            )
+
     async def _handle_forge(self, command: str, event: Incoming) -> bool:
-        """锻造系统的命令分发；不是锻造命令（或没局时的日常词）返回 False。"""
+        """**旧**锻造系统的命令分发（入口由 ``LEGACY_FORGE_ENABLED`` 控制）。
+
+        代码原样保留：新系统上线后这个开关是 False，所以这些命令不再响应。
+        """
         text = command.strip()
         group, user = event.group_openid, event.user_openid
         if is_rank_command(text):
@@ -413,7 +577,7 @@ class Handler:
                 log(f"[锻造排行榜] 渲染失败，退回文字：{error!r}")
         if path is None:
             await self.sender.text(
-                event.group_openid, rank_text(records), event.msg_id
+                event.group_openid, forge_new_leaderboard_text(records), event.msg_id
             )
             return
         try:
@@ -440,15 +604,335 @@ class Handler:
         if dropped:
             await self.sender.text(group, DOC_TRUNCATED_REPLY, event.msg_id)
 
+    async def _handle_button_test(self, command: str, event: Incoming) -> None:
+        """按钮链路自检（临时）：发一条带按钮的消息，或回报"点到了"。
+
+        「按钮测试」发面板；「按钮测试 回执」是按钮的 data，点进来走到这里。
+        """
+        group = event.group_openid
+        if command.strip() != BUTTON_TEST_COMMAND:
+            await self.sender.text(
+                group,
+                "回调通了 —— 这条是点了「回执」之后回的，说明按钮能一键执行。",
+                event.msg_id,
+            )
+            return
+        text = ("## 按钮链路测试\n"
+                "点「回执」：应当立刻回一句话（走回调，不用打字）。\n"
+                "点「功能列表」：验证按钮能复用原来的命令。")
+        rows = build_rows([["回执", "功能列表"]], highlight=True,
+                          user_ids=[event.user_openid] if event.user_openid else [])
+        try:
+            await self.sender.panel(group, text, rows, event.msg_id)
+        except Exception as error:  # noqa: BLE001 - 测试入口，失败要说清原因
+            log(f"[按钮测试] 发送失败：{error!r}")
+            await self.sender.text(
+                group,
+                f"按钮发不出去：{error}\n（多半是机器人没开「消息按钮」权限）",
+                event.msg_id,
+            )
+
+    # ----------------------------------------------------------------------
+    # 宠物
+    # ----------------------------------------------------------------------
+
+    async def _handle_pet(self, command: str, event: Incoming) -> bool:
+        """宠物相关命令的总入口。
+
+        「宠物面板」/「宠物」= 主面板；「宠物 工作」= 二级菜单；
+        「宠物 做 写代码」/「宠物 吃 大白饭」= 真正执行。按钮的 data 就是这些
+        字符串，所以点击和打字完全等价，不需要第二套逻辑。
+        """
+        text = (command or "").strip()
+        if not text.startswith(COMMAND_PREFIX):
+            return False
+        role = text[len(COMMAND_PREFIX):].strip()
+        if role in ("", "面板"):
+            await self._send_pet_panel(event)
+            return True
+        if role in GROUPS:
+            await self._send_pet_group(role, event)
+            return True
+        if role.startswith("做"):
+            return await self._pet_do(role[1:].strip(), event)
+        if role.startswith("吃"):
+            return await self._pet_eat(role[1:].strip(), event)
+        if role in ACTIONS:
+            return await self._pet_do(role, event)
+        # 不是宠物命令（比如「宠物医院」），别吃进 AI 前面
+        return False
+
+    @staticmethod
+    def _pet_main_rows() -> list[list]:
+        pairs = [(label, f"{COMMAND_PREFIX} {label}")
+                 for label in ("发呆", "睡觉", "玩耍", "工作", "学习", "吃饭")]
+        return [pairs[index:index + BUTTONS_PER_ROW]
+                for index in range(0, len(pairs), BUTTONS_PER_ROW)]
+
+    async def _send_pet_buttons(self, group: str, text: str, rows: list[list],
+                                event: Incoming) -> None:
+        """发带按钮的面板；按钮发不出去（权限/客户端）就退回纯文字。
+
+        按钮只签名给**唤出面板的那个人**（permission.type=0），别人点不动：
+        宠物是一人一只，别人按你的面板只会操作到他自己那只，看着很怪。
+        """
+        allowed = [event.user_openid] if event.user_openid else []
+        try:
+            await self.sender.panel(group, text,
+                                    build_rows(rows, highlight=True, user_ids=allowed),
+                                    event.msg_id)
+        except Exception as error:  # noqa: BLE001 - 按钮是附加能力，不能挡住命令
+            log(f"[宠物] 按钮发送失败，退回文字：{error!r}")
+            await self.sender.text(group, text, event.msg_id)
+
+    async def _send_pet_panel(self, event: Incoming) -> None:
+        """主面板：状态图 → 带按钮的卡片。
+
+        QQ 的一条约消息里放不下"图 + 按钮"（按钮只能挂在 markdown 上，markdown
+        又引用不了本地图），所以拆成两条发。
+        """
+        group, user = event.group_openid, event.user_openid
+        snapshot = self.pets.snapshot(user)
+        record = snapshot["record"]
+        action = snapshot["action"]
+        line = chatter(record, action)
+        background = self.paths.data / "situation" / action.image
+        # 按钮点击的事件里没有昵称，只能拿 openid 去名册反查
+        owner = (event.username or self.roster.name_of(group, user) or "群友").strip()
+
+        rendered = None
+        try:
+            rendered = await asyncio.to_thread(
+                render_pet_card,
+                name=str(record["name"]),
+                level=int(record["level"]),
+                exp=int(record["exp"]),
+                exp_need=exp_need(int(record["level"])),
+                mood=int(record["mood"]),
+                stamina=int(record["stamina"]),
+                affection=int(record["affection"]),
+                coins=int(snapshot["coins"]),
+                status=status_line(snapshot),
+                chatter=line,
+                background=background,
+                out_dir=self.render_dir,
+                mood_max=int(snapshot["mood_max"]),
+                stamina_max=int(snapshot["stamina_max"]),
+                affection_max=int(snapshot["affection_max"]),
+                max_level=MAX_LEVEL,
+                owner=owner,
+            )
+        except Exception as error:  # noqa: BLE001 - 画图失败不能挡住面板
+            log(f"[宠物] 状态图渲染失败，退回文字：{error!r}")
+        if rendered is not None:
+            try:
+                await self.sender.image(group, rendered, event.msg_id)
+            finally:
+                self._drop_rendered(rendered)
+
+        text = panel_markdown(snapshot)
+        if rendered is None:
+            # 没有图，那句话就得靠文字带出去
+            text = f"{text}\n\n「{line}」"
+        await self._send_pet_buttons(group, text, self._pet_main_rows(), event)
+
+    async def _send_pet_group(self, title: str, event: Incoming,
+                              lead: str = "") -> None:
+        """二级菜单：工作 / 学习 / 吃饭。``lead`` 是压在菜单前面的说明文字。"""
+        group, user = event.group_openid, event.user_openid
+        snapshot = self.pets.snapshot(user)
+        keys = GROUPS.get(title) or []
+        verb = "吃" if title == "吃饭" else "做"
+        pairs = [(key, f"{COMMAND_PREFIX} {verb} {key}") for key in keys]
+        # 一项一个按钮，三个一行（一行五个时吃饭那六样会排成 5+1，很难看）
+        rows = [pairs[index:index + BUTTONS_PER_ROW]
+                for index in range(0, len(pairs), BUTTONS_PER_ROW)]
+        rows.append([("返回", COMMAND_PANEL)])
+        text = group_markdown(title, keys, snapshot["record"])
+        if lead:
+            text = f"{lead}\n\n{text}"
+        await self._send_pet_buttons(group, text, rows, event)
+
+    async def _pet_do(self, key: str, event: Incoming) -> bool:
+        group, user = event.group_openid, event.user_openid
+        if key not in ACTIONS:
+            return False
+        result = self.pets.switch(user, key)
+        snapshot = self.pets.snapshot(user)
+        if result.get("ok") and key == "玩耍":
+            await self._send_pet_gif(PLAY_GIF, event)
+        text = f"{switch_text(result)}\n\n{panel_markdown(snapshot)}"
+        await self._send_pet_buttons(group, text, self._pet_main_rows(), event)
+        return True
+
+    async def _pet_eat(self, key: str, event: Incoming) -> bool:
+        group, user = event.group_openid, event.user_openid
+        if key not in FOODS:
+            return False
+        result = self.pets.eat(user, key)
+        snapshot = self.pets.snapshot(user)
+        if result.get("ok"):
+            # 不管点的是哪样，只要真吃下去了就附一张动图
+            await self._send_pet_gif(EAT_GIF, event)
+        # 三行：结算 → 吃饭结果 → 余额。想吃就继续点原来那条消息上的按钮
+        summary = settle_summary(result.get("settle"), snapshot["record"])
+        body = eat_text(result, snapshot)
+        await self.sender.text(group, f"{summary}\n{body}" if summary else body,
+                               event.msg_id)
+        return True
+
+    async def _send_pet_gif(self, filename: str, event: Incoming) -> None:
+        """给宠物操作附一张 data/images 下的动图（吃饭 eat.gif、玩耍 play.gif）。
+
+        素材不在、或者平台拒了，都只记一行日志——操作本身不能因为配图失败而失败。
+        """
+        path = self.paths.images / filename
+        if not path.is_file():
+            log(f"[宠物] 没找到动图：{path}")
+            return
+        try:
+            await self.sender.image(event.group_openid, path, event.msg_id)
+        except Exception as error:  # noqa: BLE001 - 配图是附赠的
+            log(f"[宠物] 动图发送失败：{error!r}")
+
+    # ----------------------------------------------------------------------
+    # 发语音
+    # ----------------------------------------------------------------------
+
+    async def _handle_voice_model(self, command: str, event: Incoming) -> bool:
+        """「语音模型」看有哪些嗓子，「语音模型 铃兰」直接换。
+
+        换嗓子只是记一笔状态，真正的模型重载发生在下一条语音合成时
+        （GPT-SoVITS 换权重必须重开服务，约 40 秒），所以这里不做等待。
+        """
+        if not VOICE_ENABLED:
+            return False
+        parsed = voice_model_payload(command)
+        if parsed is None:
+            return False
+        action, argument = parsed
+        if action == "list":
+            await self.sender.text(event.group_openid, models_text(), event.msg_id)
+            return True
+
+        if not can_switch_voice(event.user_openid):
+            await self.sender.text(
+                event.group_openid, "换嗓子这件事只给特定的人用哦～", event.msg_id
+            )
+            return True
+
+        # 换一次要重载 40 秒，不拦着能被刷成长期哑火。
+        now = time.time()
+        wait = VOICE_SWITCH_COOLDOWN - (now - self.last_voice_switch)
+        if wait > 0:
+            await self.sender.text(
+                event.group_openid,
+                f"我刚换过嗓子，{wait:.0f} 秒后再来～",
+                event.msg_id,
+            )
+            return True
+
+        try:
+            model = switch_model(argument)
+        except VoiceError as error:
+            await self.sender.text(event.group_openid, str(error), event.msg_id)
+            return True
+
+        self.last_voice_switch = now
+        await self.sender.text(
+            event.group_openid,
+            f"好，换成{model.name}的嗓子了。下一条语音开始生效，"
+            f"第一次要多等我加载一下（大概半分钟）。",
+            event.msg_id,
+        )
+        return True
+
+    async def _handle_voice(self, command: str, event: Incoming) -> bool:
+        """`语音：你好` 把后面的内容念出来。
+
+        必须带分隔符（空格 / ：/ ，）—— 全量消息模式下，群里随口一句
+        「说得好」不该被当成命令，这种误伤在实群里特别显眼。
+        """
+        if not VOICE_ENABLED:
+            return False
+        payload = tts_payload(command)
+        if payload is None:
+            return False
+        if not payload:
+            await self.sender.text(event.group_openid, VOICE_USAGE, event.msg_id)
+            return True
+        await self._send_tts(payload, event)
+        return True
+
+    async def _send_tts(self, text: str, event: Incoming) -> None:
+        """现场合成语音；太长就按标点拆成几条连着发。
+
+        合成不出来就明说，不装作发过了。
+        """
+        try:
+            segments = split_for_voice(text)
+        except VoiceError as error:
+            log(f"[语音] 拒绝合成：{error}")
+            await self.sender.text(event.group_openid, str(error), event.msg_id)
+            return
+        if not segments:
+            await self.sender.text(event.group_openid, VOICE_USAGE, event.msg_id)
+            return
+        for index, segment in enumerate(segments):
+            try:
+                path = await synthesize(segment)
+            except VoiceError as error:
+                log(f"[语音] 第 {index + 1}/{len(segments)} 段合成失败：{error}")
+                await self.sender.text(
+                    event.group_openid,
+                    "呜……这条我念不出来，换短一点的话试试？",
+                    event.msg_id,
+                )
+                return
+            try:
+                await self.sender.voice(event.group_openid, path, event.msg_id)
+            finally:
+                self._drop_rendered(path)   # 合成出来的音频只是中间产物，发完就删
+            if index + 1 < len(segments):
+                # 拆段时一口气连发容易被平台限流，稍微留点间隔。
+                await asyncio.sleep(0.6)
+
+    async def _send_ai_reply(self, reply: str, event: Incoming) -> None:
+        """AI 的回复：先发文字，再按情况补一条语音条。
+
+        语音是锦上添花，所以文字一定先出去，念不出来也只丢语音。
+        QQCHATBOT_VOICE_AI=1 时每条都念；否则默认只念短回复
+        （≤ VOICE_AI_SHORT_CHARS 字，QQCHATBOT_VOICE_AI_SHORT 可关）。
+        """
+        await self.sender.text_long(event.group_openid, reply, event.msg_id)
+        text = reply.strip()
+        if not VOICE_ENABLED or not text:
+            return
+        if not VOICE_AI and not (
+            VOICE_AI_SHORT and len(text) <= VOICE_AI_SHORT_CHARS
+        ):
+            return
+        try:
+            path = await synthesize(text)
+        except VoiceError as error:
+            log(f"[语音] AI 回复念不出来，只留文字：{error}")
+            return
+        try:
+            await self.sender.voice(event.group_openid, path, event.msg_id)
+        except Exception as error:  # noqa: BLE001 - 发语音失败别把整条回复弄丢
+            log(f"[语音] 发语音失败，只留文字：{error!r}")
+        finally:
+            self._drop_rendered(path)
+
     @staticmethod
     def _drop_rendered(path) -> None:
-        """渲染出来的图发完就删：它只是发消息用的中间产物，留着白占地方。"""
+        """渲染/合成出来的临时文件发完就删：只是发消息用的中间产物，留着白占地方。"""
         if path is None:
             return
         try:
             Path(path).unlink(missing_ok=True)
         except OSError as error:
-            log(f"[图片] 删除临时图失败：{error}")
+            log(f"[临时文件] 删除失败：{error}")
 
     async def _reply_lyric(self, line: str, event: Incoming) -> None:
         """歌词接龙：只回下一句（带 ~），接不上回兜底文案。
@@ -568,7 +1052,7 @@ class Handler:
         )
 
     async def _handle_checkin(self, command: str, event: Incoming) -> None:
-        """打卡（记次数）和签到（用光今日抽卡 + 发碎片 + 出签到图）。"""
+        """打卡（记次数）和签到（用光今日抽卡 + 发银币 + 出签到图）。"""
         group, user = event.group_openid, event.user_openid
         if command == "打卡":
             count = self.attendance.record(group, user)
@@ -592,9 +1076,9 @@ class Handler:
             if names else "签到成功，今天的抽卡次数已经用完了。"
         ]
         if amount is not None:
-            lines.append(f"奶龙碎片 +{amount}（今日首次签到），现在一共 {total}。")
+            lines.append(f"银币 +{amount}（今日首次签到），现在一共 {total}。")
         else:
-            lines.append("今天已经签到过了，碎片每天只有第一次签到才给哦。")
+            lines.append("今天已经签到过了，银币每天只有第一次签到才给哦。")
         summary = chr(10).join(lines)
 
         # 首选原插件那套渲染器（视觉完全一致），失败再退回简版
@@ -791,6 +1275,47 @@ class Handler:
             raise
         return paths
 
+    async def _maybe_warn_pet(self, event: Incoming) -> None:
+        """群友每发一条消息就检查一次宠物：有属性低于 10 就由大肥鱼本鱼顶一句。
+
+        同一人 30 分钟内最多一次（防止刷屏），提醒本身挂在对方这条消息上，
+        属于被动回复，不消耗主动消息额度。
+        """
+        if not event.user_openid:
+            return
+        text = self.pets.warn_text(event.user_openid)
+        if not text:
+            return
+        try:
+            await self.sender.text(event.group_openid, text, event.msg_id)
+        except Exception as error:  # noqa: BLE001 - 提醒发不出去不能影响正常回复
+            log(f"[宠物] 状态提醒发送失败：{error!r}")
+
+    def _pet_state_hint(self, group: str, user: str) -> str:
+        """这个人养的大肥鱼正在干什么 → 一句话，塞进系统提示词当背景。
+
+        * 没养过宠物的不掺和（大多数群友都没养）。
+        * 发呆时返回空串：没在忙就别提，省得模型没事找事。
+        * 只说动作和时长，不报具体数值——报了它就容易开始喊累喊饿。
+        """
+        if not user or not self.pets.exists(user):
+            return ""
+        record = self.pets.get(user)
+        action_key = str(record.get("action") or "发呆")
+        action = ACTIONS.get(action_key)
+        if action is None or action.group == "发呆":
+            return ""
+        elapsed = max(0.0, time.time() - int(record.get("action_start") or 0))
+        span = duration_text(elapsed) if elapsed >= 60 else "刚开工"
+        if action.group == "学习":
+            doing = f"你在学{action_key}"
+        elif action.group == "玩耍":
+            kind = str(record.get("play_kind") or "").strip()
+            doing = f"你在玩耍：{kind}" if kind else "你在玩耍"
+        else:
+            doing = f"你在{action_key}"
+        return f"{doing}，已经持续 {span}。"
+
     async def _reply_ai(self, prompt: str, event: Incoming) -> None:
         """@ 机器人：带上这个人的记忆（和图片）去问 DeepSeek。"""
         group, user = event.group_openid, event.user_openid
@@ -837,6 +1362,7 @@ class Handler:
             context=context,
             vision_enabled=self.vision_enabled,
             search_enabled=self.search is not None,
+            pet_state=self._pet_state_hint(group, user),
         )
         started = time.monotonic()
         kwargs: dict = {"images": images}
@@ -847,7 +1373,7 @@ class Handler:
         except Exception as error:  # noqa: BLE001 - 单条失败不能拖垮连接
             log(f"[AI] 调用失败：{error!r}")
             reply = "呜……AI暂时走丢了，等我一会儿再试嘛！"
-        await self.sender.text_long(group, reply, event.msg_id)
+        await self._send_ai_reply(reply, event)
         self.memory.record(group, user, BOT_LABEL, reply, from_bot=True)
         log(f"[AI] 用了 {time.monotonic() - started:.1f}s，回复 {len(reply)} 字")
         # 攒够了就在后台更新画像，不拖慢这次回答
@@ -868,7 +1394,8 @@ class Handler:
             return False
         if not link:
             recent = self.last_video_links.get(event.group_openid)
-            if recent and time.time() - recent[1] <= VIDEO_LINK_TTL:
+            if (recent and time.time() - recent[1] <= VIDEO_LINK_TTL
+                    and points_at_recent_video(command)):
                 link = recent[0]
         group, user = event.group_openid, event.user_openid
         # 手机端卡片：没有链接，只有标题 —— 按标题去 B站 搜一个最像的。
@@ -877,6 +1404,7 @@ class Handler:
             not link
             and bool(card_title)
             and time.time() - card_at <= VIDEO_LINK_TTL
+            and points_at_recent_video(command)
             and callable(getattr(self.video, "analyze_by_title", None))
         )
         if not link and not by_title:

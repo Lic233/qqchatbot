@@ -43,7 +43,9 @@ TOKEN_URL = API_BASE + "/app/getAppAccessToken"
 GATEWAY_URL = API_BASE + "/gateway"
 
 # GROUP_AND_C2C_EVENT：群 @ 消息、群全量消息、单聊消息都在这一位里。
-INTENTS = 1 << 25
+# INTERACTION：按钮 / 快捷菜单点击（INTERACTION_CREATE），1<<26。
+# 面板按钮走的是回调型（action.type=1），不订这一位就收不到点击事件。
+INTENTS = (1 << 25) | (1 << 26)
 
 # 被动回复：同一个 msg_id 最多回 5 次。
 MAX_PASSIVE_REPLIES = 5
@@ -99,7 +101,8 @@ PERSONA_FILE = config_file("persona.txt")
 # persona.txt 读不到时的兜底：宁可少点性格，也不能让机器人起不来。
 FALLBACK_PERSONA = (
     "你是一个群聊助手，名字叫DeepSeek，用自然、软乎乎的中文说话，句子短一点，"
-    "回答尽量简洁清楚，不刻薄。"
+    "回答尽量简洁清楚，不刻薄。你是在群里打字发言，不写动作描写、神态描写、"
+    "括号里的舞台提示，也不写环境场景，只输出对白本身。"
 )
 
 # 格式与安全硬约束，由代码保证，不依赖人设文件写没写。
@@ -118,6 +121,18 @@ HARD_RULES = (
     # 同理：贪吃是性格，不是每轮都提；不然每条回复都变成"我去吃饭了"。
     "你嘴馋、爱吃白饭也是口癖级别的设定：一条回复最多提一次吃饭，大多数回复别提；"
     "对方正经求助或情绪低落时不要拿吃饭当借口推脱、也不要扯到饭上。"
+    # 实测踩过：人设写成角色卡，模型会把它当跑团/写小说，每条都带一串表演。
+    "你是在 QQ 群里打字，不是在写小说、跑团或演舞台剧：回复的每一个字都必须是"
+    "你会打出来发出去的对白本身，禁止任何形式的动作描写、神态表情描写、内心旁白"
+    "和环境场景描写。"
+    "具体禁止：不要用 *…* 或 **…** 包起来的表演（*低头*、*小声嘀咕*、*耳朵动了动* "
+    "之类一律不要）；不要用圆括号或方括号写舞台提示（（低头）（脸红）（她走过去）"
+    "这类一律不要，括号里只能放极短的补充说明，一条最多一个、尽量不用）；"
+    "也不要写“她低下头”“窗外下着雨”“空气安静了几秒”这种叙述句。"
+    "想表达情绪就用说出来的话本身表达（直接说“有点不好意思”，而不是写动作）。"
+    # 防跑偏：加了幽默设定后，模型容易每条都硬抖机灵、把回复写成段子，甚至拿对方开涮。
+    "幽默只是调料，不是每条回复的任务：不要为了好笑讲段子、堆烂梗、解释笑点，"
+    "也不要拿对方当笑点；对方情绪低落、正经求助或话题严肃时一句玩笑都不要。"
 )
 
 # 记忆：每个 (群, 人) 各留最近这么多条，只装这个人和机器人的对话。
@@ -135,7 +150,7 @@ REPEAT_ENABLED = os.getenv("QQCHATBOT_REPEAT", "").strip().lower() not in {
 # 机器人自己的发言在上下文里叫什么，让模型分得清哪句是自己说的。
 BOT_LABEL = "你自己"
 
-# 千分位：QQ 会盯聊天消息里的长数字串（锻造价值、碎片累计很容易上六位数），
+# 千分位：QQ 会盯聊天消息里的长数字串（锻造价值、银币累计很容易上六位数），
 # 一条 123456 发出去可能触发风控。所有出群文本统一过一遍（原插件 textfmt.py）。
 NUMBER_SEPARATOR = os.getenv(
     "QQCHATBOT_NUMBER_SEPARATOR", ""
@@ -220,6 +235,158 @@ VIDEO_LINK_TTL = float(
 VIDEO_FRAMES = int(os.getenv("QQCHATBOT_VIDEO_FRAMES", "").strip() or 6)
 
 # --------------------------------------------------------------------------
+# 发语音（TTS）
+# --------------------------------------------------------------------------
+
+# 语音条走富媒体上传（file_type=3），平台认 silk / mp3 / wav / ogg，
+# 所以只要产出音频文件就行，不用自己编码 silk。
+VOICE_ENABLED = os.getenv("QQCHATBOT_VOICE", "").strip().lower() not in {
+    "0", "false", "no", "off",
+}
+
+# auto：先试 edge（在线、音质自然），没有就退 sapi（Windows 自带、离线）。
+TTS_ENGINE = os.getenv("QQCHATBOT_TTS", "").strip().lower() or "auto"
+
+# edge 的音色。中文常用的几个：
+#   zh-CN-XiaoyiNeural（女，活泼）/ zh-CN-XiaoxiaoNeural（女，温柔）
+#   zh-CN-YunxiNeural（男，少年）/ zh-CN-YunjianNeural（男，低沉）
+TTS_VOICE = os.getenv("QQCHATBOT_TTS_VOICE", "").strip() or "zh-CN-XiaoyiNeural"
+
+# sapi 的音色名，必须是系统里装了的（`python -m qqbot.voice --voices` 可列）。
+TTS_SAPI_VOICE = (
+    os.getenv("QQCHATBOT_TTS_SAPI_VOICE", "").strip() or "Microsoft Huihui Desktop"
+)
+
+# 语速 / 音调：edge 用 "+10%"、"+0Hz" 这种写法；sapi 会把百分比折算成 -10~10。
+# 音调默认 +8Hz：比晓伊原调高一点（约 1/3 个半音），甜一点但不失真（+20Hz 就开始发尖）。
+TTS_RATE = os.getenv("QQCHATBOT_TTS_RATE", "").strip() or "+0%"
+TTS_PITCH = os.getenv("QQCHATBOT_TTS_PITCH", "").strip() or "+8Hz"
+
+# 一条命令最多念多少字（总上限）。超了不硬念，直接提示缩短。
+VOICE_MAX_CHARS = int(os.getenv("QQCHATBOT_VOICE_MAX_CHARS", "").strip() or 1000)
+
+# 单条语音条最多多少字：超出会自动按标点切成几条连续语音。
+# 按晓伊的语速，150 字约 30 秒——再长客户端上不好拖、也容易触平台时长限制。
+VOICE_CHUNK_CHARS = int(os.getenv("QQCHATBOT_VOICE_CHUNK_CHARS", "").strip() or 150)
+
+# 合成（含联网）的超时。
+VOICE_TIMEOUT = float(os.getenv("QQCHATBOT_VOICE_TIMEOUT", "").strip() or 40)
+
+# ---------------------------------------------------------------------------
+# GPT-SoVITS（本地自训模型，走它自带的 api_v2 服务）
+# ---------------------------------------------------------------------------
+# 关掉就把 GSV_ 相关整套忽略（`QQCHATBOT_GSV=0`），回落 edge / sapi。
+GSV_ENABLED = os.getenv("QQCHATBOT_GSV", "").strip().lower() not in {
+    "0", "false", "no", "off",
+}
+
+# GPT-SoVITS 整合包根目录（里面要有 api_v2.py 和 GPT_SoVITS/）。
+GSV_DIR = os.getenv("QQCHATBOT_GSV_DIR", "").strip() or r"F:\GPTSoVITS"
+
+# 跑 api_v2 的 python：整合包自带的 runtime，或者装了 torch 的 conda 环境。
+GSV_PYTHON = (
+    os.getenv("QQCHATBOT_GSV_PYTHON", "").strip()
+    or r"C:\Users\13483\miniconda3\envs\GPTSoVits\python.exe"
+)
+
+# 服务地址：只监听本机，端口和 api_v2.py 的 -p 参数一致。
+GSV_HOST = os.getenv("QQCHATBOT_GSV_HOST", "").strip() or "127.0.0.1"
+GSV_PORT = int(os.getenv("QQCHATBOT_GSV_PORT", "").strip() or 9880)
+
+# 自训权重：路径相对于 GSV_DIR（也可以写绝对路径）。
+# `我的模型/<角色>/` 是整理好的自包含目录（权重 + 参考音频 + 参考文本 + 样音），
+# 换角色只改这三行（权重 → 参考音频 → 参考文本），别只改一半。
+GSV_GPT_WEIGHTS = (
+    os.getenv("QQCHATBOT_GSV_GPT_WEIGHTS", "").strip()
+    or "我的模型/铃兰/GPT权重_铃兰_e8.ckpt"
+)
+GSV_SOVITS_WEIGHTS = (
+    os.getenv("QQCHATBOT_GSV_SOVITS_WEIGHTS", "").strip()
+    or "我的模型/铃兰/SoVITS权重_铃兰_e4.pth"
+)
+
+# 参考音频 + 它的台本（零样本音色克隆用，5~10 秒最合适）。
+GSV_REF_AUDIO = (
+    os.getenv("QQCHATBOT_GSV_REF_AUDIO", "").strip()
+    or str(Path(GSV_DIR) / "我的模型" / "铃兰" / "参考音频.wav")
+)
+GSV_REF_TEXT = (
+    os.getenv("QQCHATBOT_GSV_REF_TEXT", "").strip()
+    or "也不知道该找谁商量，不过爸爸的同事们都有很多尾巴呀。"
+)
+
+# 可切换的音色目录：每个子目录是一个角色（权重 + 参考音频 + 参考文本自包含）。
+# 项目里带了一份副本 `models/我的模型/`，优先用它（项目自包含、备份方便）；
+# 删掉就自动回落到整合包目录下的同名目录。
+_BUNDLED_MODELS = PLUGIN_DIR / "models" / "我的模型"
+GSV_MODELS_DIR = (
+    os.getenv("QQCHATBOT_GSV_MODELS_DIR", "").strip()
+    or str(_BUNDLED_MODELS if _BUNDLED_MODELS.is_dir()
+           else Path(GSV_DIR) / "我的模型")
+)
+
+# 没在群里换过音色时用哪个角色（在上面目录里按目录名找）。
+GSV_DEFAULT_ROLE = os.getenv("QQCHATBOT_GSV_ROLE", "").strip() or "铃兰"
+
+# 「换过音色」的选择记在这里，优先于上面三个默认值；删掉就回到默认。
+GSV_MODEL_STATE = (
+    os.getenv("QQCHATBOT_GSV_MODEL_STATE", "").strip()
+    or str(DATA_DIR / "voice_model.json")
+)
+
+# 群里发「语音模型 铃兰」就能换嗓子。默认谁都能换（小群自己人）；
+# 设成 0 就只认下面白名单里的 openid。
+VOICE_SWITCH_ANYONE = os.getenv("QQCHATBOT_VOICE_SWITCH_ANYONE", "").strip().lower() not in {
+    "0", "false", "no", "off",
+}
+
+# 允许换嗓子的 openid（逗号分隔）；VOICE_SWITCH_ANYONE=0 时才有意义。
+VOICE_SWITCH_ALLOW = tuple(
+    item.strip()
+    for item in os.getenv("QQCHATBOT_VOICE_SWITCH_ALLOW", "").split(",")
+    if item.strip()
+)
+
+# 两次切换之间至少隔多少秒：换模型要重载 40 秒，不拦着会被刷成长期哑火。
+VOICE_SWITCH_COOLDOWN = float(
+    os.getenv("QQCHATBOT_VOICE_SWITCH_COOLDOWN", "").strip() or 60
+)
+
+# v4 的采样步数：32 是默认（最稳但慢），16 大约快 3 倍，8 更快但偶有杂音。
+GSV_STEPS = int(os.getenv("QQCHATBOT_GSV_STEPS", "").strip() or 16)
+GSV_SPEED = float(os.getenv("QQCHATBOT_GSV_SPEED", "").strip() or 1.0)
+
+# 单条合成的超时（本地模型慢，比 edge 宽松得多）。
+GSV_TIMEOUT = float(os.getenv("QQCHATBOT_GSV_TIMEOUT", "").strip() or 300)
+
+# 服务没起来时自动拉起的等待上限：模型加载要 20~40 秒。
+GSV_START_TIMEOUT = float(
+    os.getenv("QQCHATBOT_GSV_START_TIMEOUT", "").strip() or 180
+)
+
+# 开机/启动 bot 时就把服务拉起来（第一次合成就不用等加载了）。
+GSV_PREWARM = os.getenv("QQCHATBOT_GSV_PREWARM", "").strip().lower() not in {
+    "0", "false", "no", "off",
+}
+
+# 开了之后，@机器人 的 AI 回复除了文字还再念一条语音（不管多长都念）。
+# 默认关：每条回复多一次合成，慢 1~3 秒，还多占一条被动回复。
+VOICE_AI = os.getenv("QQCHATBOT_VOICE_AI", "").strip().lower() in {
+    "1", "true", "yes", "on",
+}
+
+# 短回复自带一条语音条：只念这么短以内的 AI 回复，长回复念起来拖沓就不念。
+# 和上面那个「全念」是两个独立开关，不用先开 QQCHATBOT_VOICE_AI。
+VOICE_AI_SHORT = os.getenv("QQCHATBOT_VOICE_AI_SHORT", "").strip().lower() not in {
+    "0", "false", "no", "off",
+}
+# 字数按原文算：AI 常回一两句短话，100 字差不多是三四行的量，
+# 念出来十几秒，群里不至于刷屏。
+VOICE_AI_SHORT_CHARS = int(
+    os.getenv("QQCHATBOT_VOICE_AI_SHORT_CHARS", "").strip() or 100
+)
+
+# --------------------------------------------------------------------------
 # 规则表（和原插件 config.py 保持一致）
 # --------------------------------------------------------------------------
 
@@ -240,4 +407,5 @@ IMAGE_RULES = {
     "无量空处": "wuliangkongchu.gif",
     "降维打击": "jiangweidaji.gif",
     "加大功率": "加大功率.png",
+    "降维打击": "降维打击.jpg",
 }

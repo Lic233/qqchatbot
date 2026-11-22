@@ -1,21 +1,19 @@
-"""锻造排行榜：只保留锻造收益最高的**十次**历史记录。
+"""锻造排行榜：只保留锻造**总价值**最高的**十次**历史记录。
 
-* 每次**成功收工**（「结束锻造」/「收工」）记一条：收益（见
-  ``forge.reward_for``：``完成度/100 × 5000 × ln(1+价值/5000)``，四舍五入成
-  整数，跟实际发的碎片一致）、锻造人、锻造时间（精确到分
-  ``YYYY-MM-DD HH:MM``）；砸碎（完成度归零、拿 0 碎片）不记。
-* 记录里同时存下当时的**锻造价值**（``forge_value``）和**完成度**
-  （``completion``），读榜时按**当前**收益公式重算 ``value``——以后调 K 不用
-  手动改榜单；只有 ``value`` 的老记录（旧版 / 手工改的）沿用存下来的数字。
-* 收益带额外倍率时（无头骑士剑诅咒「易碎」的 ×1.6）额外存一个 ``reward_factor``，
-  重算时**连这个倍率一起乘**，所以榜上记的就是真正发到手的那份收益。
-* 顺带存下这局砸的是哪把剑（``sword``），排行榜图上要显示；老记录没有就留空。
+* 新锻造系统每次淬火完就记一条：总价值（``value``，就是打进余额的银币数）、
+  锻造人、锻造时间（精确到分 ``YYYY-MM-DD HH:MM``）、刀型（``knife``）、
+  图案模板（``pattern``）、测试分数（``score``）。总价值为 0（测试 0 分）不记。
+* 旧锻造系统（已关入口，代码还在）留下的记录只有 ``sword``（剑名）和收益，
+  照样能读、能画，缺的列显示成 ``—``。
+* 旧记录里可能还带着 ``forge_value`` / ``completion``（老收益公式的源数据）和
+  ``reward_factor``（历史上的额外倍率），读榜时仍按老公式重算 ``value``，
+  保证老记录的数字跟当初发到手的收益一致；新记录不带这些字段。
 * 只留前十：新记录要**严格高于**第十名才挤得进去；同分先到先得。
 * 整个机器人一份榜（不分群），落盘到 ``data/forge_rank.json``，
   写临时文件再原子替换，重启不丢。
 * 兼容旧 NapCat 版的文件格式：``user_id`` 可能是数字，读进来统一转成字符串；
-  渲染只用 ``value`` / ``name`` / ``time``，``user_id`` 只是内部留存。
-  （字段名沿用旧版的 ``value``，装的是这一局的收益。）
+  渲染只用 ``value`` / ``name`` / ``time`` / ``knife`` / ``pattern`` / ``score``，
+  ``user_id`` 只是内部留存。
 
 对外是 :class:`ForgeRank` 实例（路径由调用方注入），这样自检可以指向临时目录，
 不会碰真实榜单。
@@ -51,7 +49,7 @@ def ordinal(number: int) -> str:
 
 
 def _sort_key(record: dict) -> tuple[float, str]:
-    """收益高的在前；同分按时间早的在前（时间字符串可直接比较）。"""
+    """总价值高的在前；同分按时间早的在前（时间字符串可直接比较）。"""
     return (-float(record.get("value") or 0), str(record.get("time") or ""))
 
 
@@ -125,9 +123,16 @@ class ForgeRank:
             record["completion"] = completion
         if factor != 1.0:
             record["reward_factor"] = factor
-        sword_name = str(raw.get("sword") or "").strip()
-        if sword_name:
-            record["sword"] = sword_name
+        # 新系统记的刀型 / 图案 / 分数；老记录没有这些字段，读榜时留空。
+        for key in ("knife", "pattern", "sword"):
+            text = str(raw.get(key) or "").strip()
+            if text:
+                record[key] = text
+        try:
+            if raw.get("score") is not None:
+                record["score"] = int(raw["score"])
+        except (TypeError, ValueError):
+            pass
         return record
 
     def _ensure_loaded(self) -> None:
@@ -177,34 +182,31 @@ class ForgeRank:
         when: datetime.datetime | None = None,
         forge_value: float | None = None,
         completion: float | None = None,
-        reward_factor: float | None = None,
         sword: str | None = None,
+        knife: str | None = None,
+        pattern: str | None = None,
+        score: int | None = None,
     ) -> int | None:
-        """记一次收工的收益；进了前十返回名次（1 起），没进返回 None。
+        """记一局；进了前十返回名次（1 起），没进返回 None。
 
-        带上 ``forge_value`` / ``completion`` 时会一起存盘（并按当前公式重算
-        收益），以后调 K 只要读榜就会自动跟着变；只传 ``value`` 的老用法兼容。
-        ``reward_factor`` 是额外的收益倍率（无头骑士剑诅咒「易碎」的 ×1.6）：
-        会跟价值/完成度一起存，重算时连它一起乘，榜上就是实际到手的收益。
-        ``sword`` 是这一局砸的剑名（石剑 / 无头骑士剑 …），排行榜图上要显示。
+        新锻造系统只需要 ``value`` + ``knife`` / ``pattern`` / ``score``；
+        老系统那套 ``forge_value`` / ``completion`` / ``sword`` 仍然兼容
+        （带上时按老公式重算收益，以后调 K 只要读榜就会自动跟着变）。
         """
         try:
             forge_value = float(forge_value) if forge_value is not None else None
             completion = float(completion) if completion is not None else None
         except (TypeError, ValueError):
             forge_value = completion = None
-        factor = _factor_of(reward_factor)
         if forge_value is not None and completion is not None:
             value = _reward_for(forge_value, completion)
-            if factor != 1.0:
-                value = int(round(value * factor))
         else:
             try:
                 value = int(round(float(value)))
             except (TypeError, ValueError):
                 return None
         if value <= 0:
-            # 0 收益（砸碎 / 完成度归零）没有上榜的意义。
+            # 0 收益（砸碎 / 测试 0 分）没有上榜的意义。
             return None
         display_name = str(name or "").strip() or "群友"
         timestamp = (when or datetime.datetime.now()).strftime(TIME_FORMAT)
@@ -217,11 +219,15 @@ class ForgeRank:
         if forge_value is not None and completion is not None:
             entry["forge_value"] = round(forge_value, 2)
             entry["completion"] = completion
-        if factor != 1.0:
-            entry["reward_factor"] = factor
-        sword_name = str(sword or "").strip()
-        if sword_name:
-            entry["sword"] = sword_name
+        for key, raw_text in (("sword", sword), ("knife", knife), ("pattern", pattern)):
+            text = str(raw_text or "").strip()
+            if text:
+                entry[key] = text
+        if score is not None:
+            try:
+                entry["score"] = int(score)
+            except (TypeError, ValueError):
+                pass
         self._ensure_loaded()
         # 榜单满了、又没比第十名高（同分也算没超过）：不记。
         if len(self._records) >= TOP_N and value <= int(self._records[-1]["value"]):
@@ -234,14 +240,14 @@ class ForgeRank:
         for index, item in enumerate(self._records):
             if item is entry:
                 log(
-                    f"[锻造排行榜] {display_name} 收益 {value} 进榜："
+                    f"[锻造排行榜] {display_name} 总价值 {value} 进榜："
                     f"第 {index + 1} 名（{timestamp}）"
                 )
                 return index + 1
         return None
 
     def leaderboard(self) -> list[dict]:
-        """当前榜单的副本（收益从高到低，最多十条）。"""
+        """当前榜单的副本（总价值从高到低，最多十条）。"""
         self._ensure_loaded()
         return [dict(item) for item in self._records]
 

@@ -9,8 +9,12 @@
     cards.py      抽卡 / 开箱 / 库存
     features.py   功能列表、群友画像、名单、打卡、运势、老婆图
     videosum.py   B站视频链接 → 官方 AI 文稿 → 让模型评价（要 SESSDATA）
+    voice.py      语音：把 `语音：xxx` 的内容念成语音条（edge / Windows SAPI）
     handler.py    群消息业务处理（命令、关键词、歌词、AI、复读）
     net.py        WebSocket / 网关事件循环
+    panel.py      按钮面板的构造与平台限制（点击走 INTERACTION_CREATE）
+    pet.py        宠物：20 分钟一块的结算、动作表、状态文案
+    pet_card.py   宠物状态图（Pillow，situation 场景图 + 信息面板）
     selftest.py   离线自检
 
 仍然零第三方依赖（Pillow 可选）：HTTP 用 urllib，WebSocket 自己实现，
@@ -51,6 +55,8 @@ from qqbot.config import (
 )
 from qqbot.handler import Handler
 from qqbot.net import Gateway
+from qqbot.voice import describe as describe_voice
+from qqbot.voice import prewarm as prewarm_voice
 
 
 # --------------------------------------------------------------------------
@@ -152,6 +158,9 @@ async def main_async(args: argparse.Namespace) -> int:
         log("[电源] 已请求阻止系统睡眠（显示器仍可关闭；要关掉设 QQCHATBOT_KEEP_AWAKE=0）")
     elif KEEP_AWAKE and sys.platform != "win32":
         log("[电源] 非 Windows，跳过防休眠")
+    log(f"[语音] {describe_voice()}")
+    # 本地 GPT-SoVITS 要加载模型，先在后台热起来，等第一条语音时就不用干等。
+    asyncio.create_task(prewarm_voice())
     gateway = Gateway(api, handler)
     try:
         await gateway.run()
