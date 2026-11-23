@@ -12,11 +12,49 @@ from .base import *  # noqa: F401,F403
 from .cards import *  # noqa: F401,F403
 from .config import *  # noqa: F401,F403
 from .cs import *  # noqa: F401,F403
+from .devil_roulette import (
+    ACT_ACCEPT,
+    ACT_MENU,
+    ACT_SELF,
+    ACT_SHOOT,
+    ACT_USE,
+    ENTRY_FEE,
+    INVITE_TTL,
+    SESSION_TTL as DEVIL_SESSION_TTL,
+    DevilRoulette,
+    panel_data as devil_panel_data,
+)
+from .devil_roulette_data import (
+    DEFEAT_LINES,
+    FISH_NAME,
+    HURT_LINES,
+    ITEMS as DEVIL_ITEMS,
+    MAX_HP as DEVIL_MAX_HP,
+    TAUNTS as DEVIL_TAUNTS,
+)
 from .features import *  # noqa: F401,F403
 from .forge import *  # noqa: F401,F403
 from .forge_new import *  # noqa: F401,F403
 from .forge_rank import *  # noqa: F401,F403
 from .handler import *  # noqa: F401,F403
+from .pet_sword import *  # noqa: F401,F403
+# 只挑「弗一把」要用的几个名字：题库里的 ITEMS / MATERIALS 之类跟锻造的内容表
+# 重名，用 * 会把别处正在用的表整个换掉。
+from .mc_guess import (
+    MAX_ROUNDS,
+    MCGuess,
+    NUDGE_IDLE,
+    REWARD_BASE,
+    REWARD_PER_SPARE_ROUND,
+    SESSION_TTL,
+)
+from .mc_guess_data import (
+    ITEMS as MC_ITEMS,
+    VERSION_ORDER,
+    check_data,
+    find_item,
+    version_newer,
+)
 from .panel import *  # noqa: F401,F403
 from .pet import *  # noqa: F401,F403
 from .voice import *  # noqa: F401,F403
@@ -2909,6 +2947,1538 @@ async def selftest() -> int:
     finally:
         handler_module.synthesize = original_synth
         handler_module.VOICE_ENABLED = True
+
+    print("== 弗一把 ==")
+
+    # ---- 题库 ----
+    expect("题库自检全过", check_data() == [])
+    expect("题库至少 700 个（1.20.2 截止，含生物）", len(MC_ITEMS) >= 700)
+    expect("物品名不重复",
+           len({item.name for item in MC_ITEMS}) == len(MC_ITEMS))
+    expect("每件物品六维齐全、都有介绍",
+           all(item.version and item.type and item.tags and item.world
+               and item.note for item in MC_ITEMS))
+    expect("标签都是 1~4 个的细分类",
+           all(1 <= len(item.tags) <= 4 for item in MC_ITEMS))
+    expect("版本档位从小到大排好",
+           all(version_newer(before, after) == -1 for before, after
+               in zip(VERSION_ORDER, VERSION_ORDER[1:])))
+    expect("1.20.2 之后的东西不收",
+           VERSION_ORDER[-1] == "1.20.2"
+           and all(find_item(name) is None for name in
+                   ("重锤", "风弹", "铜灯", "试炼钥匙")))
+    expect("1.20.2 / 1.20 的新东西都在",
+           find_item("锻造模板") is not None
+           and find_item("饰纹陶罐") is not None
+           and find_item("刷子") is not None
+           and find_item("悬挂式樱花木告示牌") is not None)
+    expect("木质变体按官方名字收全",
+           find_item("云杉木楼梯").name == "云杉木楼梯"
+           and find_item("深色橡木台阶").name == "深色橡木台阶"
+           and find_item("诡异木门").name == "诡异木门"
+           and find_item("橡木船").name == "橡木船")
+    expect("石头变体按官方名字收全",
+           all(find_item(name).name == name for name in
+               ("切制砂岩", "切制红砂岩", "雕纹石砖", "磨制安山岩",
+                "深板岩瓦", "石英楼梯", "平滑石英台阶", "石化橡木台阶")))
+    mobs = [item for item in MC_ITEMS if item.type == "生物"]
+    expect("生物不少于 70 种", len(mobs) >= 70)
+    expect("生物用行为标签",
+           find_item("苦力怕").type == "生物"
+           and "敌对" in find_item("苦力怕").tags
+           and "被动" in find_item("绵羊").tags
+           and "亡灵" in find_item("僵尸").tags)
+    expect("生物旧名字也认",
+           find_item("羊").name == "绵羊"
+           and find_item("爬行者").name == "苦力怕"
+           and find_item("僵尸猪人").name == "僵尸猪灵")
+    expect("Boss 级生物标了稀有",
+           "稀有" in find_item("末影龙").tags
+           and find_item("末影龙").world == "末地")
+    expect("英文 id 也能猜", find_item("diamond_sword").name == "钻石剑")
+    expect("别名也能猜", find_item("地狱岩").name == "下界岩")
+    expect("空格和标点不影响", find_item(" 钻 石 剑！ ").name == "钻石剑")
+    expect("带颜色的猜后缀就算",
+           find_item("羊毛").name == "羊毛"
+           and find_item("红色羊毛").name == "羊毛"
+           and find_item("淡蓝色陶瓦").name == "陶瓦")
+    expect("乱七八糟的输入查不到", find_item("这个物品不存在喵") is None)
+
+    # ---- 六维比对 ----
+    mc_target = find_item("下界合金剑")
+    nails = MCGuess._cells(find_item("钻石剑"), mc_target)
+    expect("名称重合的字要标出来",
+           nails[0].startswith("🟨") and "重合 1 字" in nails[0])
+    expect("远古猜 1.16 亮 ⬆️", nails[1].startswith("⬆️"))
+    expect("同类型亮绿", nails[2].startswith("🟩") and "武器" in nails[2])
+    expect("标签有重合亮 🟨 并列出重合的",
+           nails[3].startswith("🟨") and "战斗" in nails[3])
+    expect("标签一个都不沾边亮 ⬜",
+           MCGuess._cells(find_item("苹果"), mc_target)[3].startswith("⬜"))
+    expect("答案更长亮 ⬆️ 并写差几个字",
+           nails[4].startswith("⬆️") and "多 2 字" in nails[4])
+    expect("生成世界相同亮绿", nails[5].startswith("🟩"))
+    expect("工具 / 武器算沾边",
+           MCGuess._cells(find_item("铁镐"), mc_target)[2].startswith("🟨"))
+    expect("方块和装备不沾边",
+           MCGuess._cells(find_item("圆石"), mc_target)[2].startswith("⬜"))
+    expect("答案更早的版本亮 ⬇️",
+           MCGuess._cells(find_item("下界合金剑"), find_item("铁剑"))[1]
+           .startswith("⬇️"))
+    expect("奖励缩到每人 15~24，平均 20 左右",
+           REWARD_BASE + int(REWARD_PER_SPARE_ROUND * (MAX_ROUNDS - 1)) == 24
+           and REWARD_BASE == 15)
+
+    # ---- 对局：开局 / 猜错 / 去重 / 猜中发奖 ----
+    handler.mc_guess.clear()
+    handler.mc_guess._pick = lambda: find_item("下界合金剑")
+
+    async def mc(content, user="MC1", name="曼波", group="G-MC"):
+        sender.events.clear()
+        sender.panels.clear()
+        await handler.handle(Incoming(
+            group_openid=group, user_openid=user, username=name,
+            content=content, msg_id="mc",
+        ))
+        return sender.events
+
+    def mc_text() -> str:
+        return sender.events[0][1] if sender.events else ""
+
+    await mc("弗一把")
+    expect("「弗一把」开出题目和规则",
+           "弗一把" in mc_text() and "生成世界" in mc_text()
+           and "20 轮" in mc_text())
+    expect("开局后这局是活的", handler.mc_guess.active("G-MC") is not None)
+    await mc("弗一把")
+    expect("没打完再开会被拦下", "还没打完" in mc_text())
+
+    await mc("弗一把 状态")
+    expect("状态报出第 0/20 轮", "第 0/20 轮" in mc_text())
+
+    await mc("钻石剑", user="MC2", name="庞月")
+    expect("猜错也回六维反馈",
+           all(dim in mc_text() for dim in
+               ("名称", "加入版本", "类型", "标签", "字数", "生成世界")))
+    expect("猜错报剩余次数", "还剩 19 次" in mc_text())
+
+    await mc("宠物", user="MC4", name="路人")
+    expect("玩的时候别的命令照旧管用", bool(sender.panels))
+
+    await mc("猜 钻石剑", user="MC3", name="群友")
+    expect("同一件反复猜不烧轮数",
+           "已经猜过" in mc_text()
+           and handler.mc_guess.active("G-MC").rounds == 1)
+
+    await mc("猜 下界合金套", user="MC3", name="群友")
+    expect("题库里没有的也不烧轮数",
+           "题库里没有" in mc_text()
+           and handler.mc_guess.active("G-MC").rounds == 1)
+
+    await mc("今天天气不错", user="MC3", name="群友")
+    expect("局内普通闲聊不会被当成猜词", sender.events == [])
+
+    def mc_total_exp(user) -> int:
+        """宠物经验是「当前等级内的进度」，换成总量才好跟奖励对账。"""
+        record = handler.pets._users.get(user) or {}
+        level = int(record.get("level") or 1)
+        return (int(record.get("exp") or 0)
+                + sum(exp_need(stage) for stage in range(1, level)))
+
+    exp_before = {user: mc_total_exp(user) for user in ("MC2", "MC3")}
+    await mc("下界合金剑", user="MC3", name="群友")
+    win_text = mc_text()
+    expect("猜中报答案和介绍",
+           "猜中" in win_text and "下界合金剑" in win_text
+           and "下界合金制的剑" in win_text)
+    expect("2 轮拿下，全员经验 = 15 + 18÷2", "全员宠物经验 +24" in win_text)
+    expect("参与过的人都拿到了经验（猜错的也算）",
+           all(mc_total_exp(user) - exp_before[user] == 24
+               for user in ("MC2", "MC3")))
+    expect("没参与的人不发经验",
+           int(handler.pets._users.get("MC4", {}).get("exp") or 0) == 0)
+    expect("猜中后局面关闭", handler.mc_guess.active("G-MC") is None)
+
+    # ---- 二十轮用完：大肥鱼难过 ----
+    handler.mc_guess._pick = lambda: find_item("蜂蜜块")
+    exp_before_loss = int(handler.pets._users.get("MC9", {}).get("exp") or 0)
+    await mc("弗一把", user="MC9", name="阿曼")
+    wrong_guesses = (
+        "铁剑", "木剑", "石剑", "金剑", "钻石剑", "弓", "弩", "盾牌",
+        "剪刀", "鞍", "皮革", "苹果", "面包", "桶", "时钟", "地图",
+        "火把", "梯子", "箱子", "熔炉",
+    )
+    for wrong in wrong_guesses:
+        await mc(f"猜 {wrong}", user="MC9", name="阿曼")
+    loss_text = mc_text()
+    expect("第二十轮猜错说大肥鱼难过",
+           "这么简单都没猜到，大肥鱼很难过(；′⌒`)" in loss_text)
+    expect("失败局揭晓答案", "蜂蜜块" in loss_text)
+    expect("失败不发经验",
+           int(handler.pets._users.get("MC9", {}).get("exp") or 0)
+           == exp_before_loss)
+    expect("失败后局面也关闭", handler.mc_guess.active("G-MC") is None)
+
+    # ---- 认输 / 超时 ----
+    await mc("弗一把", user="MC6", name="阿曼")
+    await mc("弗一把 结束", user="MC6", name="阿曼")
+    expect("认输会揭晓答案",
+           "答案是" in mc_text() and "蜂蜜块" in mc_text())
+
+    fixed = [10_000.0]
+    handler.mc_guess.now = lambda: fixed[0]
+    await mc("弗一把", user="MC7", name="阿曼")
+    fixed[0] += SESSION_TTL + 1
+    await mc("弗一把", user="MC7", name="阿曼")
+    expect("十分钟没动就散场、可以直接开新局",
+           handler.mc_guess.active("G-MC").rounds == 0
+           and "Minecraft 物品 & 生物篇" in mc_text())
+
+    handler.mc_guess.now = time.time
+    handler.mc_guess.clear()
+
+    # ---- 带颜色的题：只猜后缀也算中 ----
+    handler.mc_guess._pick = lambda: find_item("羊毛")
+    await mc("弗一把", user="MC11", name="阿曼")
+    expect("开局不再白送类型提示", "类型是「" not in mc_text())
+    await mc("猜 红色羊毛", user="MC11", name="阿曼")
+    expect("带颜色的题猜「颜色+后缀」直接算中",
+           "猜中" in mc_text() and "羊毛" in mc_text())
+    handler.mc_guess._pick = lambda: find_item("陶瓦")
+    await mc("弗一把", user="MC12", name="阿曼")
+    await mc("淡蓝色陶瓦", user="MC12", name="阿曼")
+    expect("带颜色的题猜光秃秃的后缀也算中",
+           "猜中" in mc_text() and "陶瓦" in mc_text())
+
+    # ---- 榜单 / 趣味互动 ----
+    handler.mc_guess.clear()
+    handler.mc_guess._pick = lambda: find_item("钻石剑")
+    await mc("弗一把", user="MC20", name="榜一大哥")
+    expect("开局界面直接带本群榜单", "本群榜" in mc_text())
+    await mc("钻石剑", user="MC20", name="榜一大哥")
+    expect("一轮秒杀会吐槽外挂", "这不是外挂？" in mc_text())
+    expect("猜中次数记进榜单", "第 1 次猜中" in mc_text())
+    board = handler.mc_guess.leaderboard("G-MC")
+    expect("榜首就是刚猜中的人", board and board[0]["name"] == "榜一大哥")
+    await mc("弗一把 榜单")
+    expect("「弗一把 榜单」能看完整榜",
+           "本群弗一把榜" in mc_text() and "榜一大哥" in mc_text())
+
+    handler.mc_guess._pick = lambda: find_item("苹果")
+    await mc("弗一把", user="MC20", name="榜一大哥")
+    await mc("苹果", user="MC20", name="榜一大哥")
+    expect("同一个人再中一次会累加", "第 2 次猜中" in mc_text())
+
+    fresh = MCGuess(handler.pets, paths.data)
+    expect("榜单落盘、重启还在",
+           fresh.leaderboard("G-MC")[0]["wins"] >= 2)
+
+    # 冷场提醒：把时钟往后拨，只改提醒计数
+    # （后台催更任务是真定时器，自检里先停掉，免得半夜突然说话）
+    early_ticker = getattr(handler, "_mc_ticker", None)
+    if early_ticker is not None:
+        early_ticker.cancel()
+    fixed = [20_000.0]
+    handler.mc_guess.now = lambda: fixed[0]
+    handler.mc_guess._pick = lambda: find_item("钻石剑")
+    await mc("弗一把", user="MC21", name="阿曼")
+    rounds_before = handler.mc_guess.active("G-MC").rounds
+    fixed[0] += NUDGE_IDLE + 1
+    first_nudge = handler.mc_guess.nudge("G-MC")
+    expect("冷场三分钟会催「花都谢了」",
+           bool(first_nudge) and "我等的花都谢了💔" in first_nudge)
+    expect("催更不占轮数、不改参与者",
+           handler.mc_guess.active("G-MC").rounds == rounds_before
+           and not handler.mc_guess.active("G-MC").players)
+    expect("同一时间不重复催", handler.mc_guess.nudge("G-MC") is None)
+    fixed[0] += NUDGE_IDLE + 1
+    second_nudge = handler.mc_guess.nudge("G-MC")
+    expect("第二次换个说法", bool(second_nudge) and "打哈欠" in second_nudge)
+    expect("一局最多催两次", handler.mc_guess.nudge("G-MC") is None)
+    await mc("钻石剑", user="MC21", name="阿曼")
+    expect("催更之后照样能正常玩", "猜中" in mc_text())
+    handler.mc_guess.now = time.time
+    handler.mc_guess.clear()
+    ticker = getattr(handler, "_mc_ticker", None)
+    if ticker is not None:
+        ticker.cancel()
+
+    # ---- 最后三轮给提示，但不直说 ----
+    handler.mc_guess.clear()
+    handler.mc_guess._pick = lambda: find_item("钻石剑")
+    await mc("弗一把", user="MC30", name="阿曼", group="G-HINT")
+    early = ("苹果", "面包", "桶", "时钟", "地图", "火把", "梯子", "箱子",
+             "熔炉", "皮革", "箭", "铁剑", "木剑", "石剑", "金剑", "剪刀")
+    for index, wrong in enumerate(early, 1):
+        await mc(f"猜 {wrong}", user="MC30", name="阿曼", group="G-HINT")
+        if index == 16:
+            expect("前 16 轮不给提示", "小提示" not in mc_text())
+    await mc("猜 鞍", user="MC30", name="阿曼", group="G-HINT")   # 第 17 轮，剩 3
+    expect("剩 3 轮给世界提示、不直说答案",
+           "小提示" in mc_text() and "不是自然长出来" in mc_text())
+    await mc("猜 弓", user="MC30", name="阿曼", group="G-HINT")   # 第 18 轮，剩 2
+    expect("剩 2 轮点出一个标签", "标签里有「宝石」" in mc_text())
+    await mc("猜 弩", user="MC30", name="阿曼", group="G-HINT")   # 第 19 轮，剩 1
+    expect("剩 1 轮点出名字第一个字", "第一个字是「钻」" in mc_text())
+    expect("提示不额外烧轮数",
+           handler.mc_guess.active("G-HINT").rounds == 19)
+    handler.mc_guess.clear()
+
+    await mc("猜 钻石剑", user="MC8", name="阿曼")
+    expect("没开局直接猜会给提示", "先发一句" in mc_text())
+    await mc("猜猜我是谁", user="MC8", name="阿曼")
+    expect("「猜猜我是谁」这种闲聊不接", sender.events == [])
+
+    print("== 恶魔轮盘赌 ==")
+
+    def dr_labels(panel) -> dict:
+        return {label: data for row in panel["rows"] for label, data in row}
+
+    def dr_panel_ok(panel) -> bool:
+        """平台硬限制：最多 5 行、每行最多 5 个、label 最多 10 字。"""
+        rows = (panel or {}).get("rows") or []
+        return (
+            len(rows) <= 5
+            and all(len(row) <= 5 for row in rows)
+            and all(len(label) <= 10 for row in rows for label, _ in row)
+        )
+
+    def dr_panel(game) -> dict:
+        """出一张最新面板（会作废旧面板，和真实点击一致）。"""
+        return handler.devil._game_panel(game)
+
+    def dr_click(game, label, user="DR1", name="庞月", group="G-DR") -> dict:
+        return handler.devil.handle(dr_labels(dr_panel(game))[label],
+                                    group, user, name)
+
+    def dr_reply(result: dict) -> str:
+        return ((result or {}).get("panel") or {}).get("text") \
+            or (result or {}).get("reply") or ""
+
+    def dr_run(text, user="DR1", name="庞月", group="G-DR", opponents=()) -> dict:
+        return handler.devil.handle(text, group, user, name, opponents=opponents)
+
+    def dr_start(group="G-DR", user="DR1", name="庞月", label="单人·道具"):
+        menu = dr_run("恶魔轮盘赌", user, name, group)["panel"]
+        return dr_run(dr_labels(menu)[label], user, name, group)
+
+    devil = handler.devil
+    devil.clear()
+    devil.now = time.time
+    devil.rng = random.Random(20261123)
+    # 入场费走抽卡 / 锻造同一个银币钱包：先给自检用的几号人发点钱
+    for user_id in ("DR1", "DA", "DB", "DC", "DD", "DH", "DO"):
+        handler.cards.grant_shards(user_id, 5000)
+
+    # ---- 主菜单：榜单就在最上面 ----
+    menu = dr_run("恶魔轮盘赌")["panel"]
+    expect("主菜单第二行（榜单位）就是本群榜",
+           "本群榜" in menu["text"].splitlines()[1])
+    expect("主菜单同时给出单人 / 双人 / 规则 / 榜单入口",
+           {"单人·道具", "单人·纯赌", "公开挑战", "定向挑战",
+            "完整榜单", "玩法规则"} <= set(dr_labels(menu)))
+    expect("主菜单面板过平台限制", dr_panel_ok(menu))
+    expect("菜单按钮的 data 带上面板 id 和序号",
+           sum(1 for data in dr_labels(menu).values()
+               if data.startswith("轮盘 ")) == len(dr_labels(menu)))
+
+    # ---- 单人开局 ----
+    start = dr_start()
+    game = devil.active("G-DR")
+    expect("单人开局后这桌是活的", game is not None)
+    expect("单人对手是大肥鱼（AI）",
+           game.players[1].ai and game.players[1].name == FISH_NAME)
+    expect("开局面板写明弹匣和双方电量",
+           "弹匣" in start["panel"]["text"] and "❤" in start["panel"]["text"])
+    expect("道具模式开局双方都拿到手牌",
+           all(player.items for player in game.players))
+    expect("对局面板过平台限制", dr_panel_ok(start["panel"]))
+    game.players[0].items = ["放大镜", "香烟", "啤酒", "手锯", "手铐",
+                             "逆变器", "电话", "药丸"]
+    expect("八件手牌也能排进面板（不超过 5 行）",
+           dr_panel_ok(dr_panel(game)))
+
+    # ---- 开枪：空包保枪 / 实弹掉电交枪 ----
+    game.players[0].items = []
+    game.shells = [False, True]
+    game.idx = 0
+    game.revealed = {}
+    turn_before = game.turn
+    result = dr_click(game, "朝自己开枪")
+    expect("朝自己开空包：不扣电、枪还归你",
+           game.players[0].hp == DEVIL_MAX_HP and game.turn == turn_before
+           and game.idx == 1)
+    expect("空包的结果写在面板上", "空包" in dr_reply(result))
+
+    game.players[1].ai = False          # 先关掉 AI，单独看「交枪」这件事
+    game.turn = 0
+    game.shells = [True, False]
+    game.idx = 0
+    game.players[0].hp = DEVIL_MAX_HP
+    dr_click(game, "朝自己开枪")
+    expect("朝自己开实弹：自己掉 1 点电", game.players[0].hp == DEVIL_MAX_HP - 1)
+    expect("朝自己开实弹后交枪", game.turn == 1)
+
+    # ---- 道具 ----
+    game.turn = 0
+    game.players[1].ai = True
+    game.players[0].hp = DEVIL_MAX_HP
+    game.players[1].hp = DEVIL_MAX_HP
+    game.players[1].cuffed = False
+    game.players[0].saw = False
+
+    game.shells = [True, False]
+    game.idx = 0
+    game.players[0].items = ["手锯"]
+    dr_click(game, "手锯")
+    expect("手锯用掉后进入锯短状态", game.players[0].saw
+           and not game.players[0].items)
+    game.players[1].ai = False
+    dr_click(game, "朝对方开枪")
+    expect("手锯让伤害翻倍（5 → 3）", game.players[1].hp == DEVIL_MAX_HP - 2)
+    game.players[1].ai = True
+
+    game.turn = 0
+    game.players[1].hp = DEVIL_MAX_HP
+    game.players[0].items = ["手铐"]
+    game.shells = [True, False]
+    game.idx = 0
+    dr_click(game, "手铐")
+    expect("手铐锁住对方", game.players[1].cuffed)
+    game.players[1].ai = False
+    dr_click(game, "朝对方开枪")
+    expect("被锁住的对方跳过回合，枪回到自己手里",
+           game.turn == 0 and not game.players[1].cuffed)
+    game.players[1].ai = True
+
+    game.players[0].items = ["啤酒"]
+    game.shells = [True, True, False]
+    game.idx = 0
+    dr_click(game, "啤酒")
+    expect("啤酒把当前这发退出来、弹匣前进",
+           game.idx == 1 and game.revealed.get(0) is True)
+
+    game.players[0].items = ["逆变器"]
+    game.shells = [False, True]
+    game.idx = 0
+    dr_click(game, "逆变器")
+    expect("逆变器把空包翻成实弹", game.shells[0] is True)
+
+    game.players[0].items = ["放大镜"]
+    game.shells = [False, True]
+    game.idx = 0
+    game.revealed = {}
+    result = dr_click(game, "放大镜")
+    expect("放大镜告诉当前这发是什么",
+           game.revealed.get(0) is False and "空包" in dr_reply(result))
+
+    game.players[0].items = ["电话"]
+    game.shells = [False, True, True]
+    game.idx = 0
+    game.revealed = {}
+    result = dr_click(game, "电话")
+    expect("电话点出弹匣里某一发",
+           len(game.revealed) >= 1 and "第" in dr_reply(result))
+
+    game.players[0].items = ["香烟"]
+    game.players[0].hp = 1
+    dr_click(game, "香烟")
+    expect("香烟回 1 点电", game.players[0].hp == 2)
+    game.players[0].items = ["香烟"]
+    game.players[0].hp = DEVIL_MAX_HP
+    dr_click(game, "香烟")
+    expect("满电时抽烟不会超过上限", game.players[0].hp == DEVIL_MAX_HP)
+
+    class FixedRandom(random.Random):
+        """药丸是 50/50，自检里把 random() 钉死才好断言。"""
+
+        def __init__(self, value: float) -> None:
+            super().__init__(1)
+            self.value = value
+
+        def random(self) -> float:
+            return self.value
+
+    game.players[0].items = ["药丸"]
+    game.players[0].hp = 1
+    devil.rng = FixedRandom(0.1)
+    dr_click(game, "药丸")
+    expect("药丸好运时回 2 点电", game.players[0].hp == 3)
+    game.players[0].items = ["药丸"]
+    game.players[0].hp = DEVIL_MAX_HP
+    devil.rng = FixedRandom(0.9)
+    dr_click(game, "药丸")
+    expect("药丸是坏的时候掉 1 点电", game.players[0].hp == DEVIL_MAX_HP - 1)
+    devil.rng = random.Random(20261123)
+
+    game.players[0].items = ["肾上腺素"]
+    game.players[1].items = ["香烟"]
+    dr_click(game, "肾上腺素")
+    expect("肾上腺素把对方的道具抢到自己手里",
+           "香烟" in game.players[0].items and not game.players[1].items)
+
+    expect("九件道具的名字都在按钮 10 字限制内",
+           all(len(name) <= 10 for name in DEVIL_ITEMS))
+
+    # ---- 换弹：不回血、每轮补 2 件道具、打到见底才结算 ----
+    devil.clear()
+    dr_start(group="G-DR-RELOAD")
+    reload_game = devil.active("G-DR-RELOAD")
+    reload_game.players[0].hp = 2
+    reload_game.players[1].hp = 3
+    reload_game.shells = [False]
+    reload_game.idx = 0
+    items_before = [len(player.items) for player in reload_game.players]
+    dr_click(reload_game, "朝自己开枪", group="G-DR-RELOAD")
+    expect("弹匣打空只换新弹，双方血量不回满",
+           [player.hp for player in reload_game.players] == [2, 3])
+    expect("每轮固定补发 2 件道具",
+           [len(player.items) for player in reload_game.players]
+           == [count + 2 for count in items_before])
+    expect("换弹之后这局还在继续（没人见底就不结算）",
+           not reload_game.over and reload_game.round == 2
+           and reload_game.idx == 0)
+    expect("每人 5 格电量", DEVIL_MAX_HP == 5)
+
+    # ---- 文案：对局面板不贴榜单、大肥鱼的话单独缩成引用 ----
+    reload_game.taunt = "哼，你的手在抖吧？"
+    text = handler.devil._game_panel(reload_game)["text"]
+    expect("对局中不再重复贴对局榜单", "本群榜" not in text)
+    expect("标题用一号标题、正文分层", text.startswith("# "))
+    expect("大肥鱼的话单独隔开成引用块",
+           "\n> 🐟 哼，你的手在抖吧？" in text)
+    expect("对局面板正文不超过 10 行", len(text.splitlines()) <= 10)
+
+    # ---- 入场费：扣费 / 赢了按倍率返 / 输了按模式退 ----
+    devil.clear()
+    poor_menu = dr_run("恶魔轮盘赌", "DQ", "穷鬼", "G-DR-POOR")["panel"]
+    poor = devil.handle(dr_labels(poor_menu)["单人·道具"],
+                        "G-DR-POOR", "DQ", "穷鬼")
+    expect("银币不够开不了局", "银币不够" in dr_reply(poor))
+    expect("没钱时不会白开一桌", devil.active("G-DR-POOR") is None)
+
+    devil.clear()
+    before = handler.cards.shards_of("DA")
+    dr_start(group="G-DR-FEE-WIN", user="DA", name="庞月")
+    fee_game = devil.active("G-DR-FEE-WIN")
+    expect("开局先扣入场费",
+           handler.cards.shards_of("DA") == before - ENTRY_FEE)
+    fee_game.players[1].hp = 1
+    fee_game.shells = [True]
+    fee_game.idx = 0
+    fee_won = dr_click(fee_game, "朝对方开枪", user="DA", name="庞月",
+                       group="G-DR-FEE-WIN")
+    expect("道具模式赢了按 1.4 倍返还入场费",
+           handler.cards.shards_of("DA")
+           == before - ENTRY_FEE + int(round(ENTRY_FEE * 1.4)))
+    expect("结算面板写明入场和返还",
+           "入场" in dr_reply(fee_won) and "返" in dr_reply(fee_won))
+
+    devil.clear()
+    before = handler.cards.shards_of("DB")
+    dr_start(group="G-DR-FEE-LOSE", user="DB", name="阿伟")
+    dr_run("恶魔轮盘赌 认输", "DB", "阿伟", "G-DR-FEE-LOSE")
+    expect("道具模式输了入场费全赔",
+           handler.cards.shards_of("DB") == before - ENTRY_FEE)
+
+    devil.clear()
+    before = handler.cards.shards_of("DC")
+    dr_start(group="G-DR-FEE-PURE", user="DC", name="路人",
+             label="单人·纯赌")
+    dr_run("恶魔轮盘赌 认输", "DC", "路人", "G-DR-FEE-PURE")
+    expect("纯赌模式输了返还一半入场费",
+           handler.cards.shards_of("DC")
+           == before - ENTRY_FEE + int(round(ENTRY_FEE * 0.5)))
+
+    # ---- 纯赌模式：没有道具 ----
+    devil.clear()
+    pure_start = dr_start(group="G-DR-PURE", label="单人·纯赌")
+    pure_game = devil.active("G-DR-PURE")
+    expect("纯赌模式双方都没有手牌",
+           not any(player.items for player in pure_game.players))
+    expect("纯赌面板不给道具按钮",
+           not any(label in dr_labels(pure_start["panel"])
+                   for label in ("放大镜", "香烟", "手锯")))
+    blocked = devil.handle(
+        devil_panel_data(pure_game.gid, pure_game.seq, ACT_USE, "放大镜"),
+        "G-DR-PURE", "DR1", "庞月",
+    )
+    expect("纯赌模式点道具会被拦下", "纯赌" in dr_reply(blocked))
+
+    # ---- 认输 / 打赢大肥鱼 / 榜单 ----
+    devil.clear()
+    devil.rng = random.Random(5)
+    dr_start(group="G-DR-LOSE")
+    lose_game = devil.active("G-DR-LOSE")
+    lost = dr_run("恶魔轮盘赌 认输", group="G-DR-LOSE")
+    expect("认输会结束这局", lose_game.over
+           and devil.active("G-DR-LOSE") is None)
+    expect("认输算输给大肥鱼", lose_game.winner == FISH_NAME)
+    expect("输了会看到大肥鱼得意的台词",
+           any(line in dr_reply(lost)
+               for line in ("就这？", "下一局记得", "小鱼干到手", "赢了赢了",
+                            "还敢嘴硬", "谢谢款待")))
+
+    devil.clear()
+    dr_start(group="G-DR-WIN")
+    win_game = devil.active("G-DR-WIN")
+    win_game.players[1].hp = 1
+    win_game.shells = [True, False]
+    win_game.idx = 0
+    won = dr_click(win_game, "朝对方开枪", group="G-DR-WIN")
+    expect("电趴大肥鱼后它很不甘心",
+           any(line in dr_reply(won) for line in DEFEAT_LINES))
+    expect("结算面板记下胜场", "1胜0负" in dr_reply(won))
+    expect("结算面板过平台限制", dr_panel_ok(won["panel"]))
+
+    fresh_devil = DevilRoulette(paths.data)
+    board = fresh_devil.leaderboard("G-DR-WIN")
+    expect("榜单落盘、重启还在", bool(board) and board[0]["wins"] >= 1)
+    menu = dr_run("恶魔轮盘赌", group="G-DR-WIN")["panel"]
+    expect("主菜单里面能直接看到刚打的胜场",
+           "1胜" in menu["text"] and "本群榜" in menu["text"])
+
+    rematch = devil.handle(dr_labels(won["panel"])["再来一局"],
+                           "G-DR-WIN", "DR1", "庞月")
+    expect("再来一局能直接开新的一桌",
+           bool(rematch.get("panel")) and devil.active("G-DR-WIN") is not None)
+
+    # ---- 谁血量归零谁输（包括朝自己开枪把自己电死）----
+    devil.clear()
+    dr_start(group="G-DR-SELFKILL")
+    self_game = devil.active("G-DR-SELFKILL")
+    self_game.players[0].hp = 1
+    self_game.shells = [True]
+    self_game.idx = 0
+    suicide = dr_click(self_game, "朝自己开枪", group="G-DR-SELFKILL")
+    expect("朝自己开枪把自己电死：是自己输，不是自己赢",
+           self_game.over and self_game.winner == FISH_NAME)
+    expect("自尽按输结算（道具模式入场费全赔）",
+           "入场 100 → 返 0" in dr_reply(suicide))
+
+    # ---- 双人对赌：定向挑战 ----
+    devil.clear()
+    invite = dr_run("恶魔轮盘赌", "DA", "庞月", "G-DR-PVP",
+                    opponents=[("DB", "阿伟")])["panel"]
+    expect("定向挑战的按钮只签给被 @ 的人", invite["user_ids"] == ["DB"])
+    expect("挑战帖写明有效期", str(int(INVITE_TTL)) in invite["text"])
+    expect("挑战帖过平台限制", dr_panel_ok(invite))
+    third = devil.handle(dr_labels(invite)["接受·道具"],
+                         "G-DR-PVP", "DC", "路人")
+    expect("别人接不了定向挑战", "阿伟" in dr_reply(third))
+    before_duel = (handler.cards.shards_of("DA"), handler.cards.shards_of("DB"))
+    started = devil.handle(dr_labels(invite)["接受·纯赌"],
+                           "G-DR-PVP", "DB", "阿伟")
+    pvp = devil.active("G-DR-PVP")
+    expect("被点名的人接受后开局", pvp is not None and not pvp.solo)
+    expect("接受的时候自己选模式", pvp.mode == "纯赌")
+    expect("发起人先手", pvp.players[0].user == "DA")
+    expect("双人局两边各交一份入场费",
+           (handler.cards.shards_of("DA"), handler.cards.shards_of("DB"))
+           == (before_duel[0] - ENTRY_FEE, before_duel[1] - ENTRY_FEE))
+    expect("双人开局面板过平台限制", dr_panel_ok(started["panel"]))
+
+    pvp.players[1].hp = DEVIL_MAX_HP
+    pvp.shells = [True, False]
+    pvp.idx = 0
+    pvp.revealed = {}
+    not_yet = devil.handle(dr_labels(started["panel"])["朝自己开枪"],
+                           "G-DR-PVP", "DB", "阿伟")
+    expect("没轮到自己点按钮会被拦下", "回合" in dr_reply(not_yet))
+    devil.handle(dr_labels(started["panel"])["朝对方开枪"],
+                 "G-DR-PVP", "DA", "庞月")
+    expect("双人局的伤害记在对方身上",
+           pvp.players[1].hp == DEVIL_MAX_HP - 1 and pvp.turn == 1)
+
+    # 双人局里自尽：血量归零的人输，对手赢
+    devil.clear()
+    kill_menu = dr_run("恶魔轮盘赌", "DA", "庞月", "G-DR-PVP2")["panel"]
+    kill_open = devil.handle(dr_labels(kill_menu)["公开挑战"],
+                             "G-DR-PVP2", "DA", "庞月")
+    devil.handle(dr_labels(kill_open["panel"])["接受·纯赌"],
+                 "G-DR-PVP2", "DB", "阿伟")
+    kill_game = devil.active("G-DR-PVP2")
+    kill_game.players[0].hp = 1
+    kill_game.shells = [True]
+    kill_game.idx = 0
+    kill_game.revealed = {}
+    kill_result = devil.handle(dr_labels(devil._game_panel(kill_game))["朝自己开枪"],
+                               "G-DR-PVP2", "DA", "庞月")
+    expect("双人局里把自己电死的人算输",
+           kill_game.over and kill_game.winner == "阿伟")
+    expect("双人结算排名：赢家第 1、自尽的人第 2",
+           "阿伟 1胜0负 · 本群第 1" in dr_reply(kill_result)
+           and "庞月 0胜1负 · 本群第 2" in dr_reply(kill_result))
+
+    # ---- 双人对赌：拒绝 / 公开挑战 / 一桌一座 ----
+    devil.clear()
+    refused = dr_run("恶魔轮盘赌", "DA", "庞月", "G-DR-REFUSE",
+                     opponents=[("DB", "阿伟")])["panel"]
+    answer = devil.handle(dr_labels(refused)["拒绝"], "G-DR-REFUSE", "DB", "阿伟")
+    expect("另一边可以拒绝挑战", "拒绝" in dr_reply(answer))
+
+    devil.clear()
+    open_menu = dr_run("恶魔轮盘赌", "DA", "庞月", "G-DR-OPEN")["panel"]
+    opened = devil.handle(dr_labels(open_menu)["公开挑战"],
+                          "G-DR-OPEN", "DA", "庞月")
+    expect("公开挑战谁都能接", opened["panel"]["user_ids"] == [])
+    expect("发起人自己不能接",
+           "自己接自己" in dr_reply(devil.handle(
+               dr_labels(opened["panel"])["接受·道具"],
+               "G-DR-OPEN", "DA", "庞月")))
+    devil.handle(dr_labels(opened["panel"])["接受·道具"],
+                 "G-DR-OPEN", "DC", "路人")
+    expect("旁人接了直接开局", devil.active("G-DR-OPEN") is not None)
+    busy_menu = dr_run("恶魔轮盘赌", "DD", "阿曼", "G-DR-OPEN")["panel"]
+    blocked = devil.handle(dr_labels(busy_menu)["单人·道具"],
+                           "G-DR-OPEN", "DD", "阿曼")
+    expect("同一个群不能同时开两桌", "已经有一桌" in dr_reply(blocked))
+
+    # ---- 过期：挑战帖 / 对局 / 旧面板 ----
+    fixed = [1000.0]
+    devil.now = lambda: fixed[0]
+    devil.clear()
+    stale_invite = dr_run("恶魔轮盘赌", "DA", "庞月", "G-DR-EXP",
+                          opponents=[("DB", "阿伟")])["panel"]
+    fixed[0] += INVITE_TTL + 1
+    expired = devil.handle(dr_labels(stale_invite)["接受·道具"],
+                           "G-DR-EXP", "DB", "阿伟")
+    expect("挑战帖三分钟不接就过期", "过期" in dr_reply(expired))
+
+    devil.clear()
+    before_ttl = handler.cards.shards_of("DA")
+    ttl_menu = dr_run("恶魔轮盘赌", "DA", "庞月", "G-DR-TTL")["panel"]
+    devil.handle(dr_labels(ttl_menu)["单人·纯赌"], "G-DR-TTL", "DA", "庞月")
+    expect("开局先扣入场费",
+           handler.cards.shards_of("DA") == before_ttl - ENTRY_FEE)
+    fixed[0] = 2000.0
+    fixed[0] += DEVIL_SESSION_TTL + 1
+    expect("半小时没人动就散桌", devil.active("G-DR-TTL") is None)
+    expect("超时散桌把入场费原路退回",
+           handler.cards.shards_of("DA") == before_ttl)
+    devil.now = time.time
+
+    devil.clear()
+    stale_menu = dr_run("恶魔轮盘赌", "DA", "庞月", "G-DR-STALE")["panel"]
+    devil.handle(dr_labels(stale_menu)["单人·纯赌"],
+                 "G-DR-STALE", "DA", "庞月")
+    stale_game = devil.active("G-DR-STALE")
+    old_data = devil_panel_data(stale_game.gid, stale_game.seq, ACT_SHOOT)
+    dr_panel(stale_game)          # 出一张新面板，旧的就该作废
+    stale = devil.handle(old_data, "G-DR-STALE", "DA", "庞月")
+    expect("旧面板点了只提示看最新那条", "最新" in dr_reply(stale))
+
+    # ---- 大肥鱼的 AI 与台词 ----
+    devil.clear()
+    ai_start = dr_start(group="G-DR-AI")
+    ai_game = devil.active("G-DR-AI")
+    ai_game.players[1].items = []
+    ai_game.players[0].hp = DEVIL_MAX_HP
+    ai_game.shells = [True, False]
+    ai_game.idx = 0
+    ai_game.turn = 1
+    ai_game.revealed = {0: True}
+    devil._ai_act(ai_game)
+    expect("大肥鱼知道是实弹就打人",
+           ai_game.players[0].hp == DEVIL_MAX_HP - 1)
+
+    ai_game.turn = 1
+    ai_game.shells = [False, True]
+    ai_game.idx = 0
+    ai_game.revealed = {0: False}
+    devil._ai_act(ai_game)
+    expect("大肥鱼知道是空包就打自己、继续开枪", ai_game.turn == 1)
+
+    expect("大肥鱼有一整套奶凶台词", len(DEVIL_TAUNTS) >= 8)
+    expect("大肥鱼被打败的不甘心台词够多", len(DEFEAT_LINES) >= 5)
+    expect("大肥鱼挨打和打中人都有一句话",
+           len(HURT_LINES) >= 3 and any(HURT_LINES))
+    expect("大肥鱼的电量和玩家同一个上限", DEVIL_MAX_HP == 5)
+
+    # ---- handler 路由：文字命令 / @ 定向挑战 / 闲聊不误伤 ----
+    devil.clear()
+    sender.events.clear()
+    sender.panels.clear()
+    await handler.handle(Incoming(
+        group_openid="G-DR-H", user_openid="DH", username="庞月",
+        content="恶魔轮盘赌", msg_id="mdr1",
+    ))
+    expect("handler 把「恶魔轮盘赌」路由成按钮面板", bool(sender.panels))
+    expect("面板正文带本群榜",
+           bool(sender.events) and "本群榜" in sender.events[0][1])
+
+    sender.events.clear()
+    sender.panels.clear()
+    await handler.handle(Incoming(
+        group_openid="G-DR-H2", user_openid="DH", username="庞月",
+        content="恶魔轮盘赌", msg_id="mdr2", mention_ids=["DO"],
+    ))
+    permission = sender.panels[-1][0]["buttons"][0]["action"]["permission"]
+    expect("handler 把 @ 到的人当成挑战对象",
+           permission.get("type") == 0
+           and "DO" in (permission.get("specify_user_ids") or []))
+
+    sender.events.clear()
+    sender.panels.clear()
+    await handler.handle(Incoming(
+        group_openid="G-DR-H", user_openid="DH", username="庞月",
+        content="今天吃什么好呢", msg_id="mdr3",
+    ))
+    expect("普通闲聊不会被恶魔轮盘赌抢走", not sender.events)
+    devil.clear()
+    devil.now = time.time
+
+    print("== 宠物冒险 ==")
+
+    class Forged:
+        """冒充 forge_new.Session：剑库只读这几个字段。"""
+
+        user = "A1"
+        name = "冒险测试"
+        knife = "M9刺刀"
+        pattern = "渐变之色"
+        attrs = [88, 74, 66]
+        wear = 0.02
+
+        class material:  # noqa: N801 - 冒充 Material 实例
+            name = "强化合金"
+
+    async def af(content, user="A1", name="冒险测试", msg_id="af"):
+        sender.events.clear()
+        sender.panels.clear()
+        await handler.handle(Incoming(
+            group_openid="G1", user_openid=user, username=name,
+            content=content, msg_id=msg_id,
+        ))
+
+    def af_button(label):
+        rows = sender.panels[-1] if sender.panels else []
+        for row in rows:
+            for button in row["buttons"]:
+                if button["render_data"]["label"] == label:
+                    return button["action"]["data"]
+        return ""
+
+    def af_labels():
+        rows = sender.panels[-1] if sender.panels else []
+        return [button["render_data"]["label"]
+                for row in rows for button in row["buttons"]]
+
+    def af_panel_ok() -> bool:
+        """面板必须过 panel.py 的平台限制：≤5 行、每行 ≤5 个、label ≤10 字。"""
+        rows = sender.panels[-1] if sender.panels else []
+        return (bool(rows) and len(rows) <= MAX_ROWS
+                and all(1 <= len(row["buttons"]) <= MAX_BUTTONS_PER_ROW
+                        for row in rows)
+                and all(len(button["render_data"]["label"]) <= MAX_LABEL_CHARS
+                        for row in rows for button in row["buttons"]))
+
+    def af_text() -> str:
+        return sender.events[0][1] if sender.events else ""
+
+    async def af_home():
+        """回到没在打的那张首页（顺手清掉结算画面）。"""
+        await af("宠物 冒险")
+        if af_button("回主面板"):
+            await af(af_button("回主面板"))
+        if af_button("收工"):
+            await af(af_button("收工"))
+            await af("宠物 冒险")
+            if af_button("回主面板"):
+                await af(af_button("回主面板"))
+
+    async def af_start():
+        await af_home()
+        await af(af_button("出发"))
+
+    async def af_battle(kind=KIND_NORMAL):
+        run = handler.swords._run("A1")
+        run["options"] = [handler.swords._battle_node(run, kind)]
+        handler.swords._save()
+        await af("宠物 冒险")
+        await af(af_button("①" + handler.swords._run("A1")["options"][0]["label"]))
+
+    # ---- 内容表 ----
+    monster_names = [monster.name for plane in PLANES
+                     for monster in plane.pool + (plane.elite, plane.boss)]
+    expect("8 个位面 × 每位面 5 层",
+           len(PLANES) == 8 and FLOORS_PER_PLANE == 5)
+    expect("40 只怪，名字不重复",
+           len(monster_names) == 40 and len(set(monster_names)) == 40)
+    expect("每只怪都有自己的招式",
+           all(monster.moves for plane in PLANES
+               for monster in plane.pool + (plane.elite, plane.boss)))
+    expect("道具 19 / 遗物 20 / 招式 10 / 事件 24",
+           (len(ITEMS), len(RELICS), len(MOVES), len(EVENTS)) == (19, 20, 10, 24))
+    expect("每个道具都写了效果，并标明是一次性的",
+           all(item.desc and item.once for item in ITEMS.values()))
+    expect("遗物说明里正面和负面都写着",
+           all(len(relic.desc) >= 6 for relic in RELICS.values())
+           and any("但" in relic.desc or "-" in relic.desc
+                   for relic in RELICS.values()))
+    expect("招式描述里写了冷却与倍数",
+           all("冷却" in move.desc for move in MOVES.values()
+               if move.cooldown))
+
+    # ---- 难度：越往后越硬 ----
+    p1 = stats_for(PLANES[0].pool[0], 1, 1, KIND_NORMAL)
+    p1_boss = stats_for(PLANES[0].boss, 1, 5, KIND_BOSS)
+    p8 = stats_for(PLANES[7].pool[0], 8, 5, KIND_NORMAL)
+    p8_boss = stats_for(PLANES[7].boss, 8, 5, KIND_BOSS)
+    expect("同一只怪在第 40 关比第 1 关硬一倍以上",
+           stats_for(PLANES[0].pool[0], 8, 5, KIND_NORMAL)["hp"] > p1["hp"] * 2)
+    expect("最后的首领比第一只小怪硬 10 倍以上",
+           p8_boss["hp"] > p1["hp"] * 10)
+    expect("首领血量 / 攻击都比同层小怪高",
+           p1_boss["hp"] > p1["hp"] and p8_boss["attack"] > p8["attack"])
+    expect("第 40 关的银币也更高", loot_coins(8, 5, KIND_BOSS) > loot_coins(1, 1, KIND_NORMAL) * 5)
+
+    # ---- 分支随机性 ----
+    layouts = set()
+    for seed in range(40):
+        handler.swords.rng = random.Random(seed)
+        fake = {"plane": 1, "floor": 2, "owner": "A1"}
+        nodes = handler.swords._build_options(fake)
+        expect_ok = 2 <= len(nodes) <= 3 and all(node["detail"] for node in nodes)
+        if not expect_ok:
+            layouts.add(("BAD",))
+        layouts.add(tuple(node["kind"] for node in nodes))
+    expect("每层都是 2~3 条分支，而且每条都写了内容",
+           ("BAD",) not in layouts)
+    expect("存在“只有打怪和精英”的分支组合",
+           any(all(kind in ("战斗", "精英") for kind in combo)
+               for combo in layouts if combo != ("BAD",)))
+    expect("不是每层都一定有休整或事件",
+           any("休整" not in combo and "事件" not in combo
+               for combo in layouts if combo != ("BAD",)))
+    handler.swords.rng = random.Random(1)
+    boss_nodes = handler.swords._build_options({"plane": 2, "floor": 5, "owner": "A1"})
+    expect("第 5 层只有一个首领",
+           [node["kind"] for node in boss_nodes] == [KIND_BOSS])
+
+    # ---- 开局 ----
+    handler.cards.grant_shards("A1", 2000)
+    handler.swords.clear()
+    handler.swords.rng = random.Random(3)
+    blade = handler.swords.record_forge(Forged(), 420, 9000)
+    expect("锻造收工的剑自动进剑库",
+           blade is not None and len(handler.swords.swords_of("A1")) == 1)
+    expect("剑库落盘", (temporary / SWORD_FILE).is_file())
+
+    await af("宠物 冒险")
+    expect("首页有「出发 / 剑库 / 养成」三个按钮",
+           {"出发", "剑库", "养成"} <= set(af_labels()))
+    expect("首页写清位面塔规模", "8 个位面 × 5 层" in af_text())
+    expect("首页过平台限制", af_panel_ok())
+
+    await af(af_button("出发"))
+    run = handler.swords._run("A1")
+    expect("开局在位面1第1层", (run["plane"], run["floor"]) == (1, 1))
+    expect("血量 = 26 + 坚韧//2 + 等级×2",
+           run["hp_max"] == 26 + toughness_of(blade) // 2 + 2)
+    expect("开局锋利度就是剑的锋利度", run["sharp"] == blade["sharp"])
+    expect("开局就有 2~3 条分支", 2 <= len(run["options"]) <= 3)
+    expect("分支的说明都写在面板上",
+           all(node["detail"] in af_text() for node in run["options"]))
+    expect("地图面板过平台限制", af_panel_ok())
+
+    battle_node = handler.swords._battle_node(run, KIND_NORMAL)
+    expect("战斗分支写明怪物血量 / 攻击 / 预计银币",
+           "HP" in battle_node["detail"] and "攻击" in battle_node["detail"]
+           and "银币" in battle_node["detail"])
+    event_node = handler.swords._event_node()
+    expect("事件分支写明第一个选项能拿到什么",
+           "事件：" in event_node["detail"] and "——" in event_node["detail"])
+
+    # ---- 战斗 ----
+    run = handler.swords._run("A1")
+    run["options"] = [handler.swords._battle_node(run, KIND_NORMAL)]
+    handler.swords._save()
+    await af("宠物 冒险")
+    await af(af_button("①战斗"))
+    run = handler.swords._run("A1")
+    battle = run["battle"]
+    expect("战斗面板写了敌人、意图、我的血",
+           "意图" in af_text() and "HP" in af_text())
+    expect("战斗按钮有挥剑 / 防守 / 道具 / 撤退",
+           {"挥剑", "防守", "道具", "撤退"} <= set(af_labels()))
+    expect("战斗面板过平台限制", af_panel_ok())
+
+    before_sharp = run["sharp"]
+    battle["hp"] = 1
+    handler.swords._save()
+    await af(af_button("挥剑"))
+    run = handler.swords._run("A1")
+    expect("打赢进战利品面板，三选一",
+           run["mode"] == "reward" and len(run["rewards"]) == 3)
+    expect("打赢一场扣 4 点锋利度", run["sharp"] == before_sharp - 4)
+    expect("银币先进本局钱包", run["coins"] > 0)
+    expect("战利品面板过平台限制", af_panel_ok())
+
+    await af(af_button(af_labels()[0]))
+    run = handler.swords._run("A1")
+    expect("拿完战利品进第 2 层", (run["plane"], run["floor"]) == (1, 2))
+    expect("通过一层给 1 鲸鳞", run["scales"] == 1)
+
+    # ---- 事件：每个选项的结果都写在面板上 ----
+    run = handler.swords._run("A1")
+    run["options"] = [handler.swords._event_node()]
+    handler.swords._save()
+    await af("宠物 冒险")
+    await af(af_button("①事件"))
+    event_obj = EVENTS[(handler.swords._run("A1")["node"] or {})["event"]]
+    expect("事件面板逐条写清每个选项的结果",
+           all(option.detail in af_text() for option in event_obj.options))
+    expect("事件面板过平台限制", af_panel_ok())
+    await af(af_button(af_labels()[0]))
+    expect("事件做完就推进一层",
+           (handler.swords._run("A1")["plane"], handler.swords._run("A1")["floor"]) == (1, 3))
+
+    # 防守：格挡顶掉伤害
+    await af_battle()
+    run = handler.swords._run("A1")
+    run["hp"] = 50
+    run["hp_max"] = 50
+    battle = run["battle"]
+    battle["attack"] = 10
+    battle["turn"] = 1
+    battle["intent"] = {"name": "测试啃咬", "multiplier": 1.0, "effect": ""}
+    handler.swords._save()
+    await af(af_button("防守"))
+    run = handler.swords._run("A1")
+    expect("防守给出 8 + 坚韧//2 的格挡",
+           guard_block(run["tough"]) == 8 + run["tough"] // 2)
+    expect("这一下被格挡吃掉，血量没掉", run["hp"] == 50)
+    expect("拖到第 7 回合后敌人会越来越凶",
+           handler.swords._enemy_attack_now(run, dict(run["battle"], turn=10))
+           > run["battle"]["attack"] * 1.3)
+
+    # ---- 招式 ----
+    run = handler.swords._run("A1")
+    handler.swords._gain_move(run, "次元鲸斩")
+    battle = run["battle"]
+    battle["hp"] = 500
+    battle["hp_max"] = 500
+    battle["attack"] = 0
+    battle["turn"] = 1
+    battle["intent"] = {"name": "发呆", "multiplier": 0.0, "effect": ""}
+    handler.swords._save()
+    await af("宠物 冒险")
+    expect("战斗面板出现刚学会的招式", "次元鲸斩" in af_labels())
+    await af(af_button("次元鲸斩"))
+    run = handler.swords._run("A1")
+    expect("招式打出伤害", run["battle"]["hp"] < 500)
+    expect("招式进入冷却", run["cooldowns"]["次元鲸斩"] == 2)
+    await af("宠物 冒险")
+    await af(af_button("次元鲸斩"))
+    expect("冷却中放不出来",
+           any("冷却" in text for kind, text in sender.events if kind == "text"))
+
+    # ---- 道具 ----
+    run = handler.swords._run("A1")
+    run["hp"] = 20
+    run["items"] = []
+    handler.swords._gain_item(run, "疗伤牛奶")
+    handler.swords._save()
+    await af("宠物 冒险")
+    await af(af_button("道具"))
+    expect("行囊写明效果、一次性、限战斗",
+           "回复 30 HP" in af_text() and "（一次性）" in af_text())
+    expect("行囊面板过平台限制", af_panel_ok())
+    await af(af_button("用①"))
+    run = handler.swords._run("A1")
+    expect("用道具回了血", run["hp"] == 50)
+    expect("用掉之后道具栏空了", run["items"] == [])
+
+    run = handler.swords._run("A1")
+    run["hp"] = 50
+    run["items"] = []
+    handler.swords._save()
+    await af("宠物 冒险")
+    await af(af_button("道具"))
+    expect("没道具时行囊不给使用按钮",
+           not any(label.startswith("用") for label in af_labels()))
+
+    # ---- 两个格子：多的必须丢或换 ----
+    run = handler.swords._run("A1")
+    handler.swords._gain_item(run, "磨刀石")
+    handler.swords._gain_item(run, "深海护符")
+    expect("道具栏最多两个", handler.swords._gain_item(run, "回响贝壳") is False)
+    state = handler.swords.active("G1", "A1")
+    handler.swords._apply_effect(state, run, EFFECT_ITEM, "回响贝壳")
+    expect("第三个道具会弹「装不下」面板", run["mode"] == "replace")
+    await af("宠物 冒险")
+    expect("替换面板把两个旧道具都列出来",
+           "①" in af_text() and "②" in af_text())
+    await af(af_button("替换①"))
+    run = handler.swords._run("A1")
+    expect("替换后第一个格子换成新的，总数还是 2",
+           run["items"] == ["回响贝壳", "深海护符"])
+
+    run = handler.swords._run("A1")
+    state = handler.swords.active("G1", "A1")
+    handler.swords._apply_effect(state, run, EFFECT_ITEM, "星屑瓶")
+    await af("宠物 冒险")
+    await af(af_button("丢弃新的"))
+    expect("丢掉新道具时旧的两个不动",
+           handler.swords._run("A1")["items"] == ["回响贝壳", "深海护符"])
+
+    # ---- 遗物：正负效果都要生效 ----
+    run = handler.swords._run("A1")
+    run["hp_base"] = 100
+    handler.swords._refresh_max_hp(run)
+    run["hp"] = run["hp_max"] = 100
+    before_attack = handler.swords._attack_power(run)
+    handler.swords._gain_relic(run, "鲸骨护腕")
+    expect("鲸骨护腕：攻击 +15%",
+           handler.swords._attack_power(run) == int(round(before_attack * 1.15)))
+    expect("鲸骨护腕：最大生命 -10%", run["hp_max"] == 90)
+    expect("磨刀匠指环让磨刀便宜 30%",
+           sharpen_cost(100, ("磨刀匠指环",))
+           == int(round(100 * 3 * 0.7)))
+    handler.swords._gain_relic(run, "回响鳞片")
+    handler.swords._save()
+
+    # ---- v2.14：数值事件 / 新道具 / 新遗物 ----
+    expect("每个事件都配了大肥鱼的冒险描述",
+           all(len(event.text) >= 12 for event in EVENTS.values()))
+    expect("新事件里有纯正面提升（热泉疗养：最大生命 + 回血）",
+           [eff for eff, _ in EVENTS["hot_spring"].options[0].good]
+           == ["max_hp", "heal"])
+    expect("新事件里有正负交换（深渊回声：攻击换生命）",
+           ("atk", 20) in EVENTS["echo"].options[0].good
+           and ("max_hp", -20) in EVENTS["echo"].options[0].good)
+    expect("事件支持按百分比改最大生命",
+           ("max_hp", "-25%") in EVENTS["last_stand"].options[0].good)
+    expect("新道具既有纯正面也有正负",
+           ITEMS["鲸脂膏"].extra == (("max_hp", 12),)
+           and ITEMS["双刃鳞"].extra == (("max_hp", -8),)
+           and ITEMS["苦胆酒"].extra == (("self_damage", 6),))
+    expect("新道具说明把两种效果都写了",
+           "最大生命 +12" in ITEMS["鲸脂膏"].desc
+           and "最大生命 -8" in ITEMS["双刃鳞"].desc)
+    expect("新遗物既有纯正面也有正负",
+           RELICS["鲸脂护符"].desc.endswith("（纯正面）")
+           and "攻击 +18%" in RELICS["双生珊瑚"].desc
+           and "锋利度消耗 +25%" in RELICS["潮汐肺"].desc)
+
+    state = handler.swords.active("G1", "A1")
+    run = handler.swords._run("A1")
+    hp_before = int(run["hp_max"])
+    handler.swords._apply_effect(state, run, EFFECT_MAX_HP, 12)
+    expect("事件「最大生命 +12」真的生效",
+           abs(int(run["hp_max"]) - (hp_before + 12)) <= 2)
+    atk_before = handler.swords._attack_power(run)
+    handler.swords._apply_effect(state, run, EFFECT_ATK_FLAT, 6)
+    delta = handler.swords._attack_power(run) - atk_before
+    expect("事件「攻击 +6」真的生效（受百分比加成放大）",
+           5 <= delta <= 9)
+    block_before = guard_block(handler.swords._tough_power(run))
+    handler.swords._apply_effect(state, run, EFFECT_TOUGH, 10)
+    expect("事件「坚韧 +10」让防守格挡 +5",
+           guard_block(handler.swords._tough_power(run)) == block_before + 5)
+    sharp_max_before = int(run["sharp_max"])
+    handler.swords._apply_effect(state, run, EFFECT_SHARP_MAX, 10)
+    expect("事件「锋利度上限 +10」真的生效",
+           int(run["sharp_max"]) == sharp_max_before + 10)
+    hp_before = int(run["hp_max"])
+    handler.swords._apply_effect(state, run, EFFECT_MAX_HP, "-25%")
+    expect("事件能按百分比砍最大生命（-25%）",
+           abs(int(run["hp_max"]) - int(round(hp_before * 0.75))) <= 2)
+
+    run["items"] = []
+    hp_before = int(run["hp_max"])
+    notes = handler.swords._apply_item(run, run.get("battle"), ITEMS["鲸脂膏"])
+    expect("鲸脂膏：回血 + 最大生命 +12",
+           int(run["hp_max"]) > hp_before
+           and any("最大生命 +12" in note for note in notes))
+    atk_before = handler.swords._attack_power(run)
+    handler.swords._apply_item(run, None, ITEMS["鲨牙粉"])
+    delta = handler.swords._attack_power(run) - atk_before
+    expect("鲨牙粉：本局攻击 +6（受百分比加成放大）",
+           5 <= delta <= 9)
+    atk_before = handler.swords._attack_power(run)
+    hp_before = int(run["hp_max"])
+    handler.swords._apply_item(run, None, ITEMS["双刃鳞"])
+    expect("双刃鳞：攻击 +12%、最大生命下降",
+           handler.swords._attack_power(run) > atk_before
+           and 4 <= hp_before - int(run["hp_max"]) <= 10)
+    block_before = guard_block(handler.swords._tough_power(run))
+    handler.swords._apply_item(run, None, ITEMS["蜕壳素"])
+    expect("蜕壳素：坚韧 +4（格挡 +2）",
+           guard_block(handler.swords._tough_power(run)) == block_before + 2)
+    battle = run.get("battle")
+    if battle is not None:
+        hp_before = int(run["hp"])
+        handler.swords._apply_item(run, battle, ITEMS["苦胆酒"])
+        expect("苦胆酒：本场攻击 +30%，自己 -6 HP",
+               int(battle.get("atk_buff") or 0) >= 30
+               and int(run["hp"]) == hp_before - 6)
+
+    atk_before = handler.swords._attack_power(run)
+    handler.swords._gain_relic(run, "鲨齿项链")
+    expect("鲨齿项链：攻击 +10%",
+           handler.swords._attack_power(run) - atk_before
+           >= max(1, int(atk_before * 0.05)))
+    block_before = guard_block(handler.swords._tough_power(run))
+    handler.swords._gain_relic(run, "蜕鳞臂甲")
+    expect("蜕鳞臂甲：坚韧 +8（格挡 +4）",
+           guard_block(handler.swords._tough_power(run)) == block_before + 4)
+    hp_before = int(run["hp_max"])
+    handler.swords._gain_relic(run, "鲸脂护符")
+    expect("鲸脂护符：最大生命 +12%",
+           int(run["hp_max"]) > hp_before
+           and abs(int(run["hp_max"]) - int(round(hp_before * 1.12))) <= 5)
+    atk_before = handler.swords._attack_power(run)
+    hp_before = int(run["hp_max"])
+    handler.swords._gain_relic(run, "双生珊瑚")
+    expect("双生珊瑚：攻击 +18%、最大生命 -8%",
+           handler.swords._attack_power(run) > atk_before
+           and int(run["hp_max"]) < hp_before)
+    base_cost = handler.swords._battle_sharp_cost(run, KIND_NORMAL)
+    hp_before = int(run["hp_max"])
+    handler.swords._gain_relic(run, "潮汐肺")
+    expect("潮汐肺：最大生命 +10%、锋利度消耗 +25%",
+           int(run["hp_max"]) > hp_before
+           and handler.swords._battle_sharp_cost(run, KIND_NORMAL)
+           == max(1, int(round(base_cost * 1.25))))
+    handler.swords._save()
+
+    # ---- 局外养成 ----
+    record = handler.swords.user("A1")
+    record["meta"]["points"] = 10
+    handler.swords._save()
+    await af("宠物 养成")
+    expect("养成面板列出全部 6 项",
+           sum(1 for upgrade in META_UPGRADES.values()
+               if upgrade.name in af_text()) == 6)
+    expect("养成面板过平台限制", af_panel_ok())
+    await af(af_button("硬鳞"))
+    meta = handler.swords.user("A1")["meta"]
+    expect("买一级硬鳞：等级 +1、鲸鳞 -2",
+           meta["upgrades"]["hp"] == 1 and meta["points"] == 8)
+    meta["points"] = 0
+    handler.swords._save()
+    await af(af_button("利齿"))
+    expect("鲸鳞不够时明确拒绝",
+           any("鲸鳞" in text for kind, text in sender.events if kind == "text"))
+
+    await af_home()
+    await af(af_button("出发"))
+    expect("养成「硬鳞」让下一趟血量 +8",
+           handler.swords._run("A1")["hp_max"] == 26 + toughness_of(blade) // 2 + 2 + 8)
+
+    # ---- 位面推进 / 首领 / 通关 ----
+    run = handler.swords._run("A1")
+    run["plane"] = 1
+    run["floor"] = 5
+    run["options"] = [handler.swords._battle_node(run, KIND_BOSS)]
+    handler.swords._save()
+    await af("宠物 冒险")
+    await af(af_button("①首领"))
+    run = handler.swords._run("A1")
+    run["battle"]["hp"] = 1
+    scales_before = run["scales"]
+    handler.swords._save()
+    await af(af_button("挥剑"))
+    run = handler.swords._run("A1")
+    expect("首领额外给 3 鲸鳞", run["scales"] == scales_before + 3)
+    await af(af_button(af_labels()[0]))
+    run = handler.swords._run("A1")
+    expect("打完位面首领进下一位面第 1 层",
+           (run["plane"], run["floor"]) == (2, 1))
+
+    run["plane"] = 8
+    run["floor"] = 5
+    run["options"] = [handler.swords._battle_node(run, KIND_BOSS)]
+    handler.swords._save()
+    await af("宠物 冒险")
+    await af(af_button("①首领"))
+    run = handler.swords._run("A1")
+    run["battle"]["hp"] = 1
+    handler.swords._save()
+    await af(af_button("挥剑"))
+    await af(af_button(af_labels()[0]))
+    last = handler.swords.user("A1").get("last_run") or {}
+    expect("打完第 8 个位面的首领 = 通关",
+           last.get("outcome") == "clear" and last.get("scales", 0) >= 10)
+    expect("通关奖励是鲸鳞 + 宠物经验（不再是银币）",
+           last.get("exp", 0) > 0 and "coins" not in last)
+    expect("通关后先问要不要存档",
+           "通关 · 存档" in af_text() and "①存入" in af_labels())
+    expect("存档面板过平台限制", af_panel_ok())
+    expect("通关后没有进行中的一趟", handler.swords._run("A1") is None)
+
+    # ---- 通关存档：3 个栏位 / 覆盖确认 ----
+    snapshot = handler.swords.active("G1", "A1").save_snapshot
+    expect("存档里是打首领之前的状态",
+           isinstance(snapshot, dict) and snapshot.get("plane") == 8
+           and snapshot.get("floor") == 5)
+    await af(af_button("①存入"))
+    expect("存进 1 号栏位",
+           isinstance(handler.swords.user("A1")["saves"][0], dict))
+    expect("存完写明已存入并给回主面板",
+           "已存入" in af_text() and af_button("回主面板") != "")
+
+    async def af_pending_save():
+        """手动挂一份待存快照，用来测覆盖 / 不保存。"""
+        panel = handler.swords.active("G1", "A1")
+        panel.save_snapshot = dict(snapshot or {})
+        panel.end = {"outcome": "clear", "coins": 0, "scales": 0,
+                     "plane": 8, "floor": 5, "floors": 40, "sword": "测试",
+                     "sharp": 50, "left": 0, "points": 0}
+        await af("宠物 冒险")
+
+    await af_pending_save()
+    await af(af_button("①存入"))
+    expect("已占用的栏位先问要不要覆盖",
+           "覆盖" in af_text() and af_button("覆盖") != "")
+    await af(af_button("取消"))
+    expect("取消覆盖回到存档面板", "通关 · 存档" in af_text())
+    await af(af_button("②存入"))
+    expect("2 号栏位也能存",
+           isinstance(handler.swords.user("A1")["saves"][1], dict))
+    await af_pending_save()
+    await af(af_button("不保存"))
+    expect("不保存就回结算面板并注明没存",
+           "没有存档" in af_text() and af_button("回主面板") != "")
+
+    # ---- 哦鲸鲸大挑战 ----
+    class PickRng:
+        """random() 恒为 0（赌概率必中），choice 优先挑指定首领。"""
+
+        def __init__(self, item, base):
+            self.item = item
+            self.base = base
+
+        def choice(self, seq):
+            if isinstance(seq, (list, tuple)) and self.item in seq:
+                return self.item
+            return self.base.choice(seq)
+
+        def random(self):
+            return 0.0
+
+        def randint(self, low, high):
+            return self.base.randint(low, high)
+
+        def uniform(self, low, high):
+            return self.base.uniform(low, high)
+
+    await af("哦鲸鲸大挑战")
+    expect("大挑战面板列出三档存档和三个首领",
+           af_labels()[:3] == ["①挑战", "②挑战", "③挑战"]
+           and "海德软脚虾" in af_text()
+           and "显卡吞噬者老黄" in af_text() and "川建国" in af_text())
+    expect("大挑战面板过平台限制", af_panel_ok())
+    await af(af_button("③挑战"))
+    expect("空栏位不能开挑战",
+           any("还没有存档" in text for kind, text in sender.events
+               if kind == "text"))
+
+    # 首领 1：锁血 + 二阶段反弹
+    handler.swords.rng = PickRng(CHALLENGE_BOSSES[0], random.Random(1))
+    await af("哦鲸鲸大挑战")
+    await af(af_button("①挑战"))
+    run = handler.swords._run("A1")
+    expect("挑战开局随机到海德软脚虾",
+           bool(run and run.get("challenge"))
+           and run["battle"]["name"] == "海德软脚虾")
+    expect("挑战战斗面板过平台限制", af_panel_ok())
+    run["battle"]["hp"] = 1
+    run["hp"] = 500
+    run["hp_max"] = 500
+    handler.swords._save()
+    await af("宠物 冒险")
+    await af(af_button("挥剑"))
+    run = handler.swords._run("A1")
+    expect("一击秒杀会锁血并进二阶段",
+           run["battle"]["name"] == "北国沙鹰虾"
+           and run["battle"]["hp"] == 1800
+           and run["battle"]["challenge_phase"] == 2)
+    expect("转阶段那一回合它不出手", run["hp"] == 500)
+    expect("二阶段下一手是防御（反弹）",
+           (run["battle"]["intent"] or {}).get("effect") == "reflect")
+    boss_hp = run["battle"]["hp"]
+    await af("宠物 冒险")
+    await af(af_button("挥剑"))
+    run = handler.swords._run("A1")
+    expect("它防御时攻击会被反弹（自己掉血）", run["hp"] < 500)
+    expect("反弹阶段它只掉一点血", run["battle"]["hp"] > boss_hp - 300)
+    run["battle"]["hp"] = 1
+    run["battle"]["intent"] = {"name": "攻击", "multiplier": 1.0, "effect": ""}
+    handler.swords._save()
+    await af("宠物 冒险")
+    await af(af_button("挥剑"))
+    challenge = handler.swords.user("A1").get("last_challenge") or {}
+    expect("挑战成功给鲸鳞和宠物经验",
+           challenge.get("outcome") == "challenge_win"
+           and challenge.get("scales") == CHALLENGE_SCALES
+           and challenge.get("exp", 0) >= CHALLENGE_EXP)
+    expect("挑战结算不再发银币", challenge.get("exp", 0) > 0
+           and "coins" not in challenge)
+    expect("挑战胜场记进存档",
+           int(handler.swords.user("A1")["saves"][0]["wins"]) == 1)
+
+    # 首领 2：麻痹让防守失效
+    handler.swords.rng = PickRng(CHALLENGE_BOSSES[1], random.Random(2))
+    await af("哦鲸鲸大挑战")
+    await af(af_button("①挑战"))
+    run = handler.swords._run("A1")
+    expect("挑战开局随机到老黄",
+           run["battle"]["name"] == "显卡吞噬者老黄")
+    expect("面板写明麻痹机制", "麻痹" in af_text())
+    run["hp"] = 400
+    run["hp_max"] = 400
+    handler.swords._save()
+    await af("宠物 冒险")
+    await af(af_button("挥剑"))
+    run = handler.swords._run("A1")
+    expect("老黄的攻击会让人麻痹", int(run["battle"].get("paralyzed") or 0) == 1)
+    hp_before = run["hp"]
+    await af("宠物 冒险")
+    await af(af_button("防守"))
+    run = handler.swords._run("A1")
+    expect("麻痹时防守失效（挡不住，直接掉血）", run["hp"] < hp_before)
+    expect("挑战失败会记负场", True)  # 占位，下面真的打输再断言
+    run["hp"] = 1
+    run["battle"]["attack"] = 999
+    run["battle"]["intent"] = {"name": "必杀", "multiplier": 1.0, "effect": ""}
+    handler.swords._save()
+    await af("宠物 冒险")
+    await af(af_button("挥剑"))
+    challenge = handler.swords.user("A1").get("last_challenge") or {}
+    expect("挑战失败：不发鲸鳞和经验、记负场",
+           challenge.get("outcome") == "challenge_lose"
+           and challenge.get("scales") == 0
+           and challenge.get("exp") == 0
+           and int(handler.swords.user("A1")["saves"][0]["losses"]) == 1)
+
+    # 首领 3：攻击被弹开 + 自己回血
+    handler.swords.rng = PickRng(CHALLENGE_BOSSES[2], random.Random(3))
+    await af("哦鲸鲸大挑战")
+    await af(af_button("①挑战"))
+    run = handler.swords._run("A1")
+    expect("挑战开局随机到川建国", run["battle"]["name"] == "川建国")
+    expect("面板写明弹开与回血机制",
+           "弹开" in af_text() and "回复" in af_text())
+    run["battle"]["hp"] = 2000
+    boss_hp = run["battle"]["hp"]
+    run["battle"]["attack"] = 0
+    run["battle"]["intent"] = {"name": "发呆", "multiplier": 0.0, "effect": ""}
+    handler.swords._save()
+    await af("宠物 冒险")
+    await af(af_button("挥剑"))
+    run = handler.swords._run("A1")
+    expect("川建国会把攻击弹开（这一刀不掉血）",
+           int(run["battle"]["hp"]) >= boss_hp)
+    expect("他每回合还会自己回血", int(run["battle"]["hp"]) > boss_hp)
+
+    other = SwordAdventure(paths.data, lambda: handler.cards, handler.pets)
+    expect("存档落盘，新实例也读得到",
+           isinstance(other.user("A1")["saves"][0], dict))
+    # 这一场挑战先撤掉，免得影响后面的位面塔测试
+    await af("宠物 冒险")
+    await af(af_button("撤退"))
+    handler.swords.rng = random.Random(3)
+
+    # ---- 阵亡 ----
+    await af_home()
+    await af(af_button("出发"))
+    run = handler.swords._run("A1")
+    run["coins"] = 300
+    run["scales"] = 4
+    run["battles"] = [{"kind": KIND_BOSS, "turns": 2,
+                       "plane": 1, "floor": 1}]
+    run["hp"] = 1
+    run["options"] = [handler.swords._battle_node(run, KIND_NORMAL)]
+    expected_scales, expected_exp = handler.swords._run_reward(run, "dead")
+    handler.swords._save()
+    await af("宠物 冒险")
+    await af(af_button("①战斗"))
+    run = handler.swords._run("A1")
+    run["battle"]["attack"] = 999
+    run["battle"]["intent"] = {"name": "必杀", "multiplier": 1.0, "effect": ""}
+    handler.swords._save()
+    await af(af_button("挥剑"))
+    last = handler.swords.user("A1").get("last_run") or {}
+    expect("阵亡只带回一半鲸鳞和经验",
+           last.get("outcome") == "dead"
+           and last.get("scales") == expected_scales
+           and last.get("exp") == expected_exp)
+    expect("阵亡结算里没有银币字段", "coins" not in last)
+    expect("阵亡没有把进行中的一趟留在存档里",
+           handler.swords._run("A1") is None)
+
+    # ---- 经验按回合数算 ----
+    expect("回合越少经验越多",
+           battle_exp(KIND_BOSS, 1) > battle_exp(KIND_BOSS, 5)
+           > battle_exp(KIND_BOSS, 9) > 0)
+    expect("首领的经验底子最高",
+           battle_exp(KIND_BOSS, 9) > battle_exp(KIND_ELITE, 9)
+           > battle_exp(KIND_NORMAL, 9))
+
+    # ---- 鲸鳞兑换：启程资金 / 道具仓库 ----
+    await af_home()
+    meta = handler.swords.user("A1")["meta"]
+    meta["points"] = 60
+    handler.swords._save()
+    await af("鲸鳞兑换")
+    expect("兑换面板列出启程资金和全部兑换道具",
+           "启程资金" in af_text()
+           and all(name in af_text() for name, _ in EXCHANGE_ITEMS))
+    expect("兑换面板过平台限制", af_panel_ok())
+    first_name, first_price = EXCHANGE_ITEMS[0]
+    await af(af_button("①买"))
+    user = handler.swords.user("A1")
+    expect("买道具扣鲸鳞、放进仓库",
+           user["meta"]["points"] == 60 - first_price
+           and user["vault"]["items"].get(first_name) == 1)
+    await af(af_button("启程资金"))
+    user = handler.swords.user("A1")
+    expect("启程资金升级扣鲸鳞并记等级",
+           user["vault"]["silver"] == 1
+           and user["meta"]["points"]
+           == 60 - first_price - EXCHANGE_SILVER_COSTS[0])
+    await af(af_button("返回"))
+    await af(af_button("出发"))
+    run = handler.swords._run("A1")
+    expect("启程资金让开局多一笔局内银币",
+           run["coins"] == exchange_silver_bonus(1))
+    expect("仓库道具开局自动带入", first_name in run["items"])
+    expect("仓库里的道具用掉一件少一件",
+           not handler.swords.user("A1")["vault"]["items"].get(first_name))
+    wallet_before = handler.cards.shards_of("A1")
+    await af("宠物 冒险")
+    await af(af_button("收工"))
+    expect("收工后不再往钱包塞银币",
+           handler.cards.shards_of("A1") == wallet_before)
+
+    # ---- 存档：新实例也能读回进行中的一趟 ----
+    await af_home()
+    await af(af_button("出发"))
+    other = SwordAdventure(paths.data, lambda: handler.cards, handler.pets)
+    expect("重开一个实例也能读回进行中的一趟", other._run("A1") is not None)
+    await af("宠物 冒险")
+    await af(af_button("收工"))
+    expect("收工也能结算", (handler.swords.user("A1").get("last_run") or {}).get("outcome") == "quit")
+
+    # ---- 命令 & 面板边界 ----
+    await af_home()
+    await af("宠物 剑库")
+    expect("「宠物 剑库」直接开剑库", "剑库" in af_text())
+    await af(af_button(af_labels()[0]))
+    expect("点剑库里的剑就换上了",
+           handler.swords.equipped_sword("A1")["id"] == blade["id"])
+    await af("宠物 面板")
+    expect("「宠物 面板」仍然走原来的宠物面板",
+           bool(sender.panels) and "大肥鱼" in af_text())
+    await af("宠物医院")
+    expect("「宠物医院」这种闲聊不会被抢走", sender.events == [])
+    expect("锻造那一局收工的剑也自动进了剑库（接线通了）",
+           len(handler.swords.swords_of("N1")) >= 1)
+
+    handler.swords.clear()
 
     print("== 规则覆盖 ==")
     rules_path = paths.data / "official_rules.json"

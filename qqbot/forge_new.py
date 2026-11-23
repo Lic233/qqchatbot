@@ -681,9 +681,13 @@ def parse_panel_data(text: str) -> tuple[str, int, str, str] | None:
 class NewForge:
     """新锻造系统的状态机：一局一个人，进度只在内存里。"""
 
-    def __init__(self, cards, rank) -> None:
+    def __init__(self, cards, rank, on_forged=None) -> None:
         self.cards = cards
         self.rank = rank
+        # 收工回调：把这一把交给别的玩法（宠物冒险的剑库）。
+        # 签名 on_forged(session, score, value) -> dict|None；抛异常只记日志，
+        # 不影响结算 —— 剑库挂了也不能让锻造的钱发不出去。
+        self.on_forged = on_forged
         self.rng = random
         self._sessions: dict[tuple[str, str], Session] = {}
 
@@ -864,8 +868,18 @@ class NewForge:
             value, session.user, session.name,
             knife=session.knife, pattern=session.pattern, score=score,
         )
+        # 这把剑另外登记一份到剑库（宠物冒险用）；银币照旧全额进余额
+        kept = None
+        if self.on_forged is not None:
+            try:
+                kept = self.on_forged(session, score, value)
+            except Exception as error:  # noqa: BLE001 - 剑库失败不能拖垮结算
+                log(f"[锻造] 剑库登记失败：{error!r}")
         text = result_text(session, scores, score, value, left, rank,
                            wear_multiplier)
+        if kept:
+            text += ("\n这把剑已经放进剑库了 —— 发「宠物 冒险」就能交给宠物使唤"
+                     "（银币照旧全额到账，剑是额外留下的）。")
         log(
             f"[锻造] {session.name} {session.material.name}/{session.knife}"
             f"/{session.pattern}/{quench} 砸{session.hammers}次 分数{score} "

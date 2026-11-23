@@ -15,6 +15,7 @@ from .cs import (
     brief_text,
     results_text,
 )
+from .devil_roulette import DevilRoulette
 from .features import *  # noqa: F401,F403
 from .forge import (
     COMMAND_ENCHANT,
@@ -43,6 +44,7 @@ from .forge_new import (
     parse_panel_data,
 )
 from .forge_rank import ForgeRank, is_rank_command
+from .mc_guess import MCGuess, NUDGE_CHECK_INTERVAL
 from .panel import BUTTON_TEST_COMMAND, build_rows
 from .pet import (
     ACTIONS,
@@ -66,6 +68,7 @@ from .pet import (
     switch_text,
 )
 from .pet_card import render_pet_card
+from .pet_sword import SwordAdventure
 from .videosum import (
     BiliClient,
     BiliBlocked,
@@ -180,10 +183,15 @@ class Handler:
         self.cards = Cards(self.paths.data)
         self.cs = CS()
         self.forge_rank = ForgeRank(self.paths.data / "forge_rank.json")
-        # 新锻造系统（按钮面板）；旧的 Forge 留着，只是入口关了（见 LEGACY_FORGE_ENABLED）
-        self.forge_new = NewForge(self.cards, self.forge_rank)
-        self.forge = Forge(self.cards, self.forge_rank)
         self.pets = Pets(self.paths.data, lambda: self.cards)
+        # 宠物冒险：把锻造出来的剑收进剑库（落盘），交给宠物出门打怪。
+        # 它要读宠物的体力/心情、要往同一个钱包里发银币，所以两个都传进去。
+        self.swords = SwordAdventure(self.paths.data, lambda: self.cards, self.pets)
+        # 新锻造系统（按钮面板）；旧的 Forge 留着，只是入口关了（见 LEGACY_FORGE_ENABLED）。
+        # 收工回调把这一把登记进剑库 —— 银币照旧全额进余额，剑是额外留下的。
+        self.forge_new = NewForge(self.cards, self.forge_rank,
+                                  on_forged=self.swords.record_forge)
+        self.forge = Forge(self.cards, self.forge_rank)
         self.attendance = Attendance(self.paths.data)
         self.roster = Roster(self.paths.data)
         self.profiles = Profiles(self.paths.data)
@@ -194,6 +202,16 @@ class Handler:
         if self.checkin_renderer is not None:
             self.checkin_renderer.CHECKIN_CARD_DIR = self.render_dir
         self.luck = DailyLuck(self.paths.data)
+        # 弗一把（Minecraft 物品版）：对局只在内存里，榜单落盘 data/mc_guess_rank.json。
+        # 自检里直接拿 handler.mc_guess 抠状态，所以名字别改。
+        self.mc_guess = MCGuess(self.pets, self.paths.data)
+        # 冷场催更的后台任务：第一次开「弗一把」时才起，自检里能拿到也能取消。
+        self._mc_ticker: asyncio.Task | None = None
+        # 恶魔轮盘赌：单人打大肥鱼 / 双人对赌，全程按钮面板。
+        # 对局在内存里；榜单落盘 data/devil_roulette_rank.json；
+        # 入场费走抽卡 / 锻造同一个银币钱包（cards）。
+        # cards 传函数是故意的：自检会整个替换 handler.cards，惰性取才不拿旧账本。
+        self.devil = DevilRoulette(self.paths.data, lambda: self.cards)
 
     # ---- 记录 ----
 
@@ -368,6 +386,12 @@ class Handler:
                 if candidate and await self._handle_forge(candidate, event):
                     return True
 
+        # 宠物冒险（把锻造出来的剑交给宠物）：文字入口「宠物 冒险」/「剑库」，
+        # 之后全靠面板按钮（data 是「冒险 …」）。放在宠物命令前面 ——
+        # 「宠物 冒险」虽然也带「宠物」前缀，但不属于 pet.py 那套动作表。
+        if await self._handle_pet_sword(command, event):
+            return True
+
         # 宠物：面板 / 发呆 / 工作 / 学习 / 吃饭。面板按钮的 data 就是这套命令，
         # 所以点击和打字走的是同一条路（见 net._handle_interaction）。
         for candidate in (
@@ -376,6 +400,17 @@ class Handler:
         ):
             if candidate and await self._handle_pet(candidate, event):
                 return True
+
+        # 弗一把（Minecraft 物品版）：开局 / 状态 / 榜单 / 认输 / 猜词。
+        # 排在固定命令之后 —— 局内发「宠物」「锻造」照样管用；普通闲聊
+        # handle() 返回 None，不会抢规则，也不会抢 AI。
+        if await self._handle_mc_guess(command, event):
+            return True
+
+        # 恶魔轮盘赌：主菜单 / 单人打大肥鱼 / 双人对赌 / 面板按钮。
+        # 按钮 data 以「轮盘」开头，普通闲聊不会被它抢走。
+        if await self._handle_devil_roulette(command, event):
+            return True
 
         # 实测：@ 的位置有时会留下机器人自己的名字（日志里出现过
         # ``'机器人 这也太这么强了吧'``）。所以对「前面的名字」再试一次。
@@ -400,6 +435,113 @@ class Handler:
             return True
         return False
 
+    async def _handle_mc_guess(self, command: str, event: Incoming) -> bool:
+        """「弗一把」：开局 / 状态 / 榜单 / 认输 / 猜词，规则全在 MCGuess.handle。
+
+        返回 False 表示这条不关它事（没在对局里、也不是物品名），继续走规则和 AI。
+        """
+        for candidate in (
+            command,
+            self._strip_leading_name(command) if command else None,
+        ):
+            if not candidate:
+                continue
+            result = self.mc_guess.handle(
+                candidate,
+                event.group_openid,
+                event.user_openid,
+                self._forge_owner(event),
+            )
+            if not result:
+                continue
+            self._ensure_mc_ticker()
+            await self.sender.text(
+                event.group_openid, str(result.get("reply") or ""), event.msg_id
+            )
+            return True
+        return False
+
+    def _ensure_mc_ticker(self) -> None:
+        """冷场提醒的定时任务：起一次就够（自检里会把它 cancel 掉）。"""
+        task = self._mc_ticker
+        if task is not None and not task.done():
+            return
+        try:
+            self._mc_ticker = asyncio.create_task(self._mc_tick())
+        except RuntimeError:      # 没有事件循环（纯同步调用）就当没有提醒
+            self._mc_ticker = None
+
+    async def _mc_tick(self) -> None:
+        """每 20 秒看一眼有没有冷场的局，有就催一句（不占轮数、不改局内状态）。"""
+        while True:
+            await asyncio.sleep(NUDGE_CHECK_INTERVAL)
+            for group in self.mc_guess.groups():
+                line = self.mc_guess.nudge(group)
+                if not line:
+                    continue
+                try:
+                    await self.sender.text(group, line)
+                except Exception as error:  # noqa: BLE001 - 催更失败不能影响对局
+                    log(f"[弗一把] 冷场提醒发送失败：{error!r}")
+
+    async def _handle_devil_roulette(self, command: str,
+                                     event: Incoming) -> bool:
+        """恶魔轮盘赌：主菜单 / 单人 / 挑战 / 面板按钮，全在 ``DevilRoulette`` 里。
+
+        @ 到的人就是挑战对象：``恶魔轮盘赌 @某人`` 会发一张只有对方能点的挑战帖。
+        @ 标记在正文里会被剥掉，所以对手只能从 ``event.mention_ids`` 里拿；
+        剥名字之后再试一次是照抄别的命令的兜底。
+        """
+        group, user = event.group_openid, event.user_openid
+        text = (command or "").strip()
+        candidates = [text] if text else []
+        variant = self._strip_leading_name(text) if text else None
+        if variant and variant != text:
+            candidates.append(variant)
+        opponents = []
+        for openid in event.mention_ids:
+            if not openid or openid == user or openid in self.bot_ids:
+                continue
+            opponents.append(
+                (openid, self.roster.name_of(group, openid) or "群友")
+            )
+        for candidate in candidates:
+            result = self.devil.handle(
+                candidate, group, user, self._forge_owner(event),
+                opponents=opponents,
+            )
+            if result is None:
+                continue
+            await self._deliver_devil_panel(result, event)
+            return True
+        return False
+
+    async def _deliver_devil_panel(self, result: dict, event: Incoming) -> None:
+        """发恶魔轮盘赌的面板或一句话。
+
+        按钮只签给「该点的人」：单人局是玩家自己，双人局是当前回合的那个人，
+        挑战帖是帖子上点名的那个人（公开挑战不签名，谁都能接，引擎再审一遍）。
+        """
+        group = event.group_openid
+        panel = result.get("panel")
+        if not panel:
+            reply = str(result.get("reply") or "")
+            if reply:
+                await self.sender.text(group, reply, event.msg_id)
+            return
+        allowed = panel.get("user_ids")
+        if allowed is None:
+            allowed = [event.user_openid] if event.user_openid else []
+        try:
+            await self.sender.panel(
+                group, panel["text"],
+                build_rows(panel["rows"], user_ids=list(allowed)),
+                event.msg_id,
+            )
+        except Exception as error:  # noqa: BLE001 - 按钮是附加能力，不能挡住流程
+            log(f"[恶魔轮盘赌] 按钮面板发送失败，退回文字：{error!r}")
+            await self.sender.text(group, panel["text"], event.msg_id)
+
     async def _handle_forge_new(self, command: str, event: Incoming) -> bool:
         """新锻造系统：「锻造」开局面板，之后只认面板按钮的 data。
 
@@ -420,14 +562,14 @@ class Handler:
                 return True
             if candidate == FORGE_NEW_COMMAND:
                 result = self.forge_new.start(group, user, self._forge_owner(event))
-                await self._deliver_forge(result, event)
+                await self._deliver_panel(result, event, "锻造")
                 return True
             parsed = parse_panel_data(candidate)
             if parsed is None:
                 continue
             forge_id, seq, action, argument = parsed
             result = self.forge_new.act(group, user, forge_id, seq, action, argument)
-            await self._deliver_forge(result, event)
+            await self._deliver_panel(result, event, "锻造")
             return True
         return False
 
@@ -439,8 +581,13 @@ class Handler:
             or "群友"
         ).strip()
 
-    async def _deliver_forge(self, result: dict, event: Incoming) -> None:
-        """发面板（带按钮）或一句纯文字；按钮发不出去就退回文字版。"""
+    async def _deliver_panel(self, result: dict, event: Incoming,
+                             tag: str = "面板") -> None:
+        """发面板（带按钮）或一句纯文字；按钮发不出去就退回文字版。
+
+        锻造和宠物冒险共用：两边都是「panel / reply」这个形状，按钮只签给
+        唤出面板的那个人（permission.type=0），别人点不动。
+        """
         group = event.group_openid
         panel = result.get("panel")
         if not panel:
@@ -456,7 +603,7 @@ class Handler:
                 event.msg_id,
             )
         except Exception as error:  # noqa: BLE001 - 按钮是附加能力，不能挡住流程
-            log(f"[锻造] 按钮面板发送失败，退回文字：{error!r}")
+            log(f"[{tag}] 按钮面板发送失败，退回文字：{error!r}")
             await self.sender.text(
                 group,
                 panel["text"]
@@ -464,6 +611,27 @@ class Handler:
                 "检查一下机器人有没有按钮权限。）",
                 event.msg_id,
             )
+
+    async def _handle_pet_sword(self, command: str, event: Incoming) -> bool:
+        """宠物冒险：认「宠物 冒险 / 剑库」这些文字入口，和「冒险 …」按钮 data。
+
+        @ 之后偶尔会残留机器人名字，所以剥掉名字再试一次（按钮 data 本来就不带名字）。
+        """
+        text = (command or "").strip()
+        candidates = [text] if text else []
+        variant = self._strip_leading_name(text) if text else None
+        if variant and variant != text:
+            candidates.append(variant)
+        for candidate in candidates:
+            if not self.swords.recognizes(candidate):
+                continue
+            result = self.swords.handle(
+                candidate, event.group_openid, event.user_openid,
+                self._forge_owner(event),
+            )
+            await self._deliver_panel(result, event, "宠物冒险")
+            return True
+        return False
 
     async def _handle_forge(self, command: str, event: Incoming) -> bool:
         """**旧**锻造系统的命令分发（入口由 ``LEGACY_FORGE_ENABLED`` 控制）。
