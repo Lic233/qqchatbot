@@ -20,6 +20,7 @@ WEB_SEARCH_TOOL = {
         "description": (
             "联网搜索。凡是涉及近期事件、实时数据（天气/股价/赛果/价格）、"
             "最新版本、人事变动，或者你自己不确定的事实时，先调用它查证。"
+            "要查就直接调用，别先用一句“我去搜搜”当回答 —— 那样等于没查。"
         ),
         "parameters": {
             "type": "object",
@@ -30,6 +31,37 @@ WEB_SEARCH_TOOL = {
                 },
             },
             "required": ["query"],
+        },
+    },
+}
+
+
+# 写记忆库的工具：模型自己判断什么值得长期记住。描述里把「记什么/别记什么」
+# 写死，否则它会顺着聊天把所有话都抄进去，几十轮之后上下文全是废话。
+REMEMBER_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "remember",
+        "description": (
+            "把事情写进记忆库，以后重启也还在。只在遇到长期有用的事实时用："
+            "对方的身份/喜好/忌口、约定和时间、正在做的长期项目、"
+            "你查过又怕自己忘的结论。一次性的闲聊、情绪、临时安排不用记；"
+            "画像和群名片里已经有的、刚记过的也不用重复记。"
+            "不要记密码、手机号、住址这类敏感信息。"
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string",
+                    "description": "要记的内容，一句话说清，别抄原话",
+                },
+                "about": {
+                    "type": "string",
+                    "description": "这条记在谁的群名片下；不填就是整个群的",
+                },
+            },
+            "required": ["content"],
         },
     },
 }
@@ -185,24 +217,65 @@ def format_search_results(results: list[SearchResult]) -> str:
     return text[:SEARCH_CONTEXT_LIMIT]
 
 
-def search_tool_query(tool_call: dict) -> str:
-    """从模型的工具调用参数里取出搜索词。"""
+def tool_arguments(tool_call: dict) -> dict:
+    """把工具调用的 arguments 解析成字典；解析不了就当空参数。"""
     try:
         arguments = json.loads(
             (tool_call.get("function") or {}).get("arguments") or "{}"
         )
     except (json.JSONDecodeError, TypeError):
-        return ""
-    query = arguments.get("query") if isinstance(arguments, dict) else None
+        return {}
+    return arguments if isinstance(arguments, dict) else {}
+
+
+def search_tool_query(tool_call: dict) -> str:
+    """从模型的工具调用参数里取出搜索词。"""
+    query = tool_arguments(tool_call).get("query")
     return str(query).strip() if query else ""
+
+
+def remember_tool_args(tool_call: dict) -> tuple[str, str]:
+    """从模型的工具调用参数里取出（要记的内容, 记在谁名下）。"""
+    arguments = tool_arguments(tool_call)
+    content = str(arguments.get("content") or "").strip()
+    about = str(arguments.get("about") or "").strip()
+    return content, about
+
+
+# 「我要去搜一下」这类空话：模型偶尔会把它当成回答直接发出去，并没有真的查。
+# 只在很短、且明显是将来时的句子里算数，正常答案里带个「查」字不会误判。
+_SEARCH_PROMISE_RE = re.compile(
+    r"(我|让我|等我|先)[^，。！？\n]{0,6}(搜|查)(一)?(下|搜|查)?"
+    r"|(得|要|需要)(去)?(搜|查)(一)?下"
+    r"|联网(搜|查)"
+    r"|查(一)?下(再|才)(说|答)"
+)
+
+
+def looks_like_search_promise(reply: str) -> bool:
+    """这句是不是「只放话去搜、其实没搜」。
+
+    只认短句，而且已经在讲结果的（「我查了一下，是…」「搜到了…」）不算 ——
+    那些是真的查过或至少给出了内容，不能再催一轮，白白多花一次请求。
+    """
+    text = " ".join((reply or "").split())
+    if not text or len(text) > 60:
+        return False
+    if re.search(r"(搜|查)到|(搜|查)了", text):
+        return False
+    return bool(_SEARCH_PROMISE_RE.search(text))
+
+
+SEARCH_NUDGE = "（别只说要查：直接调用 web_search 工具查，拿到结果再一起回答。）"
 
 
 class DeepSeek:
     """DeepSeek 对话，标准库实现（不引 httpx）。
 
     ``search`` 给定时会把 ``web_search`` 工具交给模型，由它自己决定搜不搜；
-    搜到的结果作为 tool 消息回喂，最多 ``SEARCH_MAX_ROUNDS`` 轮，最后一轮撤掉
-    工具逼它基于已有资料作答。
+    ``remember`` 给定时再给一个 ``remember`` 工具，让它自己判断要不要把这条
+    事实写进记忆库。工具结果作为 tool 消息回喂；搜索最多 ``SEARCH_MAX_ROUNDS``
+    轮，最后一轮撤掉工具，逼它基于已有资料作答。
     """
 
     def __init__(self, key: str, *, url: str = DEEPSEEK_API_URL,
@@ -231,7 +304,10 @@ class DeepSeek:
                      images: list[dict] | None = None, *,
                      temperature: float = 0.8,
                      max_tokens: int | None = None,
-                     search=None) -> str:
+                     search=None, remember=None,
+                     on_search=None) -> str:
+        """``on_search`` 在真的要联网前调一次（参数是查询词），用它在群里
+        先发一句「我去搜搜」，第二条才是答案。"""
         if not self.key:
             raise RuntimeError("未配置 DeepSeek API key（config/deepseek_api.txt）")
         # 图片只能放在 user 消息里，和文字一起按多模态内容块发。
@@ -248,16 +324,43 @@ class DeepSeek:
             "max_tokens": max_tokens or DEEPSEEK_MAX_TOKENS,
             "thinking": {"type": DEEPSEEK_THINKING},
         }
-        for round_index in range(SEARCH_MAX_ROUNDS + 1):
-            allow_search = search is not None and round_index < SEARCH_MAX_ROUNDS
+        # 搜索要联网、慢，单独限轮；写记忆库只是本地落盘，给它多留两轮余量。
+        # 最后一轮一个工具都不给，逼它必须把话说完整。
+        budget = (SEARCH_MAX_ROUNDS if search is not None else 0) + 2
+        search_rounds = 0
+        announced = False
+        nudged = False
+        for round_index in range(budget):
+            last = round_index == budget - 1
+            can_search = (search is not None and not last
+                          and search_rounds < SEARCH_MAX_ROUNDS)
+            tools: list[dict] = []
+            if not last:
+                if can_search:
+                    tools.append(WEB_SEARCH_TOOL)
+                if remember is not None:
+                    tools.append(REMEMBER_TOOL)
             request = dict(payload)
             request["messages"] = list(messages)
-            if allow_search:
-                request["tools"] = [WEB_SEARCH_TOOL]
+            if tools:
+                request["tools"] = tools
             message = await self._complete(request)
             tool_calls = message.get("tool_calls") or []
             reply = str(message.get("content") or "").strip()
-            if not tool_calls or not allow_search:
+            if not tool_calls:
+                # 模型只放了句「我去搜搜」却没调工具：推它一次，别把这句当答案。
+                # 要留得出「催 → 查 → 答」两轮，轮次不够就直接按答案处理。
+                if (can_search and not nudged and round_index + 2 < budget
+                        and looks_like_search_promise(reply)):
+                    nudged = True
+                    messages.append({"role": "assistant", "content": reply})
+                    messages.append({"role": "user", "content": SEARCH_NUDGE})
+                    log(f"[搜索] 模型只说不搜（{reply[:20]!r}），催它真去查")
+                    continue
+                if not reply:
+                    raise RuntimeError("DeepSeek 返回了空回复")
+                return reply
+            if not tools:
                 if not reply:
                     raise RuntimeError("DeepSeek 返回了空回复")
                 return reply
@@ -266,10 +369,24 @@ class DeepSeek:
                 "content": message.get("content"),
                 "tool_calls": tool_calls,
             })
+            searched = False
             for tool_call in tool_calls:
+                name = str((tool_call.get("function") or {}).get("name") or "")
+                if name == REMEMBER_TOOL["function"]["name"] and remember is not None:
+                    reply_text = await self._remember(remember, tool_call)
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tool_call.get("id") or "",
+                        "content": reply_text,
+                    })
+                    continue
                 query = search_tool_query(tool_call)
                 results: list[SearchResult] = []
-                if query:
+                if query and search is not None and search_rounds < SEARCH_MAX_ROUNDS:
+                    searched = True
+                    if not announced:
+                        announced = True
+                        await self._announce(on_search, query)
                     try:
                         results = await search(query)
                     except Exception as error:  # noqa: BLE001 - 工具失败也要继续答
@@ -279,6 +396,29 @@ class DeepSeek:
                     "tool_call_id": tool_call.get("id") or "",
                     "content": format_search_results(results),
                 })
+            if searched:
+                search_rounds += 1
             # 拿到资料后再降温度，减少对着资料编造
             payload["temperature"] = 0.3
         raise RuntimeError("DeepSeek 没能给出回答")
+
+    async def _announce(self, on_search, query: str) -> None:
+        """搜索前通知一声（群里先发「我去搜搜」）；通知失败不能影响搜索。"""
+        if on_search is None:
+            return
+        try:
+            await on_search(query)
+        except Exception as error:  # noqa: BLE001 - 只是句提示，失败就算了
+            log(f"[搜索] 搜索提示没发出去：{error!r}")
+
+    async def _remember(self, remember, tool_call: dict) -> str:
+        """执行一次记忆写入；写失败也不能把整条回答拖垮。"""
+        content, about = remember_tool_args(tool_call)
+        if not content:
+            return "没记：内容是空的。"
+        try:
+            reply = await remember(content, about)
+        except Exception as error:  # noqa: BLE001 - 记忆写不进去也要继续答
+            log(f"[记忆库] 工具调用失败：{error!r}")
+            return "这次没记上，先接着聊。"
+        return str(reply or "记下了。")

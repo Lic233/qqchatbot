@@ -37,8 +37,9 @@ def main() -> int:
         path = config_file(filename)
         state = "存在" if path.exists() else "缺失"
         total_weight = sum(getattr(item, "weight", 1) for item in items)
+        tuned = sum(1 for item in items if getattr(item, "weight", 1) != 1)
         print(f"[{label}] {path}（{state}）· {len(items)} 条"
-              f" · 权重合计 {total_weight:g}")
+              f" · 权重合计 {total_weight:g} · 非 1 权重 {tuned} 条")
         problems += [f"[{label}] {line}" for line in check()]
 
     print(f"困难模式新增条目：{len(EXTRA_ITEMS)} 条")

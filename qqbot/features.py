@@ -184,17 +184,100 @@ class Profiles:
         log(f"[画像] 已更新「{name}」：{summary[:60]}")
         return True
 
-    def forget(self, group: str, user: str) -> bool:
-        key = (group, user)
-        removed = self._samples.pop(key, None) is not None
-        self._pending.pop(key, None)
-        self._last_at.pop(key, None)
-        group_records = self.records.get(group)
-        if group_records and group_records.pop(user, None) is not None:
-            removed = True
-        if removed:
-            self._save()
-        return removed
+
+# --------------------------------------------------------------------------
+# 记忆库（模型自己写的长期笔记）
+# --------------------------------------------------------------------------
+
+
+class MemoryBank:
+    """模型自己在对话里判断「以后用得上」就写进来的长期记忆。
+
+    和 ``Memory``（内存里的原话，重启清空）是两层东西：这里存的是模型消化过
+    的一句话事实（谁是谁、口味、约定、长期在做的事、查证过的结论），落盘到
+    ``data/memory_bank_official.json``，重启不丢。
+
+    按群分开存，每条带「关于谁」—— 写进提示词时一眼能看出这是谁的事，
+    免得把 A 的偏好答给 B。
+    """
+
+    def __init__(self, data_dir: Path, *, limit: int = MEMORY_BANK_MAX) -> None:
+        self.file = data_dir / "memory_bank_official.json"
+        self.limit = max(1, int(limit))
+        payload = {}
+        try:
+            payload = json.loads(self.file.read_text(encoding="utf-8-sig"))
+        except (OSError, ValueError):
+            payload = {}
+        self.records: dict[str, list[dict[str, str | int]]] = {}
+        if isinstance(payload, dict):
+            for group, notes in payload.items():
+                if not isinstance(notes, list):
+                    continue
+                clean: list[dict[str, str | int]] = []
+                for note in notes:
+                    if not isinstance(note, dict):
+                        continue
+                    text = " ".join(str(note.get("text") or "").split())
+                    if not text:
+                        continue
+                    clean.append({
+                        "text": text[:MEMORY_BANK_NOTE_CHARS],
+                        "about": str(note.get("about") or "").strip(),
+                        "about_id": str(note.get("about_id") or "").strip(),
+                        "at": int(note.get("at") or 0),
+                    })
+                self.records[str(group)] = clean[-self.limit:]
+
+    def notes(self, group: str) -> list[dict[str, str | int]]:
+        return list(self.records.get(group) or [])
+
+    def add(self, group: str, text: str, *, about: str = "",
+            about_id: str = "") -> bool:
+        """记一条；同一个人名下已经有一模一样的就跳过（返回 False）。"""
+        text = " ".join(str(text or "").split())[:MEMORY_BANK_NOTE_CHARS]
+        if not group or not text:
+            return False
+        notes = self.records.setdefault(group, [])
+        for note in notes:
+            if note.get("text") == text and note.get("about_id") == about_id:
+                return False
+        notes.append({
+            "text": text,
+            "about": (about or "").strip(),
+            "about_id": (about_id or "").strip(),
+            "at": int(time.time()),
+        })
+        if len(notes) > self.limit:
+            del notes[:len(notes) - self.limit]
+        self._save()
+        return True
+
+    def _save(self) -> None:
+        temporary = self.file.with_name("memory_bank_official.tmp")
+        try:
+            temporary.write_text(
+                json.dumps(self.records, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            temporary.replace(self.file)
+        except OSError as error:
+            log(f"[记忆库] 保存失败：{error}")
+
+    def prompt_for(self, group: str, limit: int = MEMORY_BANK_CONTEXT) -> str:
+        """拼成提示词里的一段：从新往旧取到字数上限，返回时改回时间顺序。"""
+        lines: list[str] = []
+        total = 0
+        for note in reversed(self.notes(group)):
+            about = str(note.get("about") or "")
+            text = str(note.get("text") or "")
+            line = f"- [关于{about}] {text}" if about else f"- [群里的] {text}"
+            if lines and total + len(line) > limit:
+                break
+            lines.append(line)
+            total += len(line) + 1
+        lines.reverse()
+        return "\n".join(lines)
 
 
 # --------------------------------------------------------------------------

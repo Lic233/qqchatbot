@@ -195,6 +195,8 @@ class Handler:
         self.attendance = Attendance(self.paths.data)
         self.roster = Roster(self.paths.data)
         self.profiles = Profiles(self.paths.data)
+        # 记忆库：模型自己判断值得长期记住的事，落盘 data/memory_bank_official.json。
+        self.memory_bank = MemoryBank(self.paths.data)
         # 原版渲染器的输出目录要跟着数据目录走（自检时是临时目录）
         self.checkin_renderer = load_checkin_renderer()
         # 渲染图只是发消息的中间产物：放系统临时目录，发完就删，data/ 里不留东西
@@ -301,20 +303,6 @@ class Handler:
             if lyric is not None:
                 await self._reply_lyric(lyric, event)
                 return True
-
-        # 「忘掉我」：清掉这个人自己的记忆（和原插件 memory.forget 一致）
-        if command == "忘掉我":
-            forgotten = self.memory.forget(event.group_openid, event.user_openid)
-            forgotten = self.profiles.forget(
-                event.group_openid, event.user_openid
-            ) or forgotten
-            await self.sender.text(
-                event.group_openid,
-                "好啦好啦，你的那点事我已经忘干净了～" if forgotten
-                else "我本来就不记得你什么呀",
-                event.msg_id,
-            )
-            return True
 
         # 记住这个人（@ 人要用），顺手节流落盘
         self.roster.remember(event.group_openid, event.user_openid, event.username)
@@ -1467,7 +1455,11 @@ class Handler:
         return f"{doing}，已经持续 {span}。"
 
     async def _reply_ai(self, prompt: str, event: Incoming) -> None:
-        """@ 机器人：带上这个人的记忆（和图片）去问 DeepSeek。"""
+        """@ 机器人：带上群里的对话（和图片）去问 DeepSeek。
+
+        记忆按群共享，但提示词里标出了正在对话的人（见 Memory.transcript），
+        所以模型既知道群里刚才聊了什么，也分得清现在在跟谁说话。
+        """
         group, user = event.group_openid, event.user_openid
         if not prompt and not event.images:
             # 平台会把「图 + @」拆成两条消息，所以没文字也没图时再看一眼刚发的图。
@@ -1513,11 +1505,17 @@ class Handler:
             vision_enabled=self.vision_enabled,
             search_enabled=self.search is not None,
             pet_state=self._pet_state_hint(group, user),
+            memory_notes=self.memory_bank.prompt_for(group)
+            if MEMORY_BANK_ENABLED else "",
         )
         started = time.monotonic()
         kwargs: dict = {"images": images}
         if self.search is not None:
             kwargs["search"] = self.search
+            kwargs["on_search"] = self._search_notice(event)
+        remember = self._remember_hook(group, user, event.username)
+        if remember is not None:
+            kwargs["remember"] = remember
         try:
             reply = await self.chat(system, prompt + note, **kwargs)
         except Exception as error:  # noqa: BLE001 - 单条失败不能拖垮连接
@@ -1529,6 +1527,66 @@ class Handler:
         # 攒够了就在后台更新画像，不拖慢这次回答
         if self.chat is not None and self.profiles.should_summarize(group, user):
             asyncio.create_task(self.profiles.summarize(group, user, self.chat))
+
+    def _search_notice(self, event: Incoming):
+        """联网前先在群里补一句「我去搜搜」，第二条才是答案。
+
+        模型自己偶尔会回一句「得查一下」就不动了，那种情况交给 ai.py 里的催查；
+        这里只负责真的开搜时先给个反馈，省得群里干等十几秒。
+        """
+        sent = False
+
+        async def notice(query: str = "") -> None:
+            nonlocal sent
+            if sent:
+                return
+            sent = True
+            log(f"[搜索] 先回一句提示（查询：{query[:30]!r}）")
+            await self.sender.text(
+                event.group_openid,
+                random.choice(SEARCH_NOTICE_LINES),
+                event.msg_id,
+            )
+
+        return notice
+
+    def _member_id(self, group: str, name: str) -> str:
+        """群名片 → openid（名册里查不到就返回空串，只按名字记）。"""
+        for uid, member_name in self.roster.members(group):
+            if member_name == name:
+                return uid
+        return ""
+
+    def _remember_hook(self, group: str, user: str, name: str):
+        """把「写记忆库」做成工具交给模型，由它自己判断记不记、记什么。
+
+        默认记在当前说话人名下；模型给了 ``about``（别人的群名片）就记到那个人
+        名下，给了 ``about`` 但认不出人时退回「群里的」。
+        """
+        if not MEMORY_BANK_ENABLED or self.chat is None:
+            return None
+        speaker = name or (user or "")[:8] or "群友"
+
+        async def remember(content: str, about: str = "") -> str:
+            text = " ".join(str(content or "").split())
+            if not text:
+                return "没记：内容是空的。"
+            about = (about or "").strip()
+            if not about or about == speaker:
+                subject, subject_id = speaker, user
+            else:
+                subject, subject_id = about, self._member_id(group, about)
+                if not subject_id:
+                    # 认不出这个人就不硬安名字，退回记在群里
+                    subject = ""
+            note = f"[关于{subject}] {text}" if subject else text
+            if not self.memory_bank.add(group, text, about=subject,
+                                        about_id=subject_id):
+                return "这条已经记过了，不用重复记。"
+            log(f"[记忆库] {note[:60]}")
+            return "记下了。"
+
+        return remember
 
     async def _handle_video(self, command: str, event: Incoming,
                             link: str = "") -> bool:

@@ -5,8 +5,9 @@
 * 群里有人发「弗一把」，先弹一块面板，按钮是**简单模式 / 困难模式**；
   点了才抽题。两个模式规则完全一样，只有题库不同：
   - **简单**：``mc_guess_data.ITEMS``（Java 1.20.2 截止），原样没动；
-  - **困难**：``mc_guess_data_hard``，26.1 及以前的全部物品与生物
-    （1.20.5 犰狳 → 1.21 试炼密室 → 1.21.11 鹦鹉螺 / 矛 → 26.1 金蒲公英都在）。
+  - **困难**：``mc_guess_data_hard``，26.3 及以前的全部物品与生物
+    （1.20.5 犰狳 → 1.21 试炼密室 → 1.21.11 鹦鹉螺 / 矛 → 26.1 金蒲公英 →
+    26.2 硫方怪 / 硫黄 / 朱砂 → 26.3 杨树 / 层孔菇 / 坐垫都在）。
 * 之后谁都可以猜：直接发物品名 / 生物名，或者「猜 名字」。**全群共享二十轮**，
   每猜一次算一轮，猜错也会给六维反馈：
   名称重合 / 加入版本 / 类型 / 标签 / 字数 / 生成世界。
@@ -40,6 +41,7 @@ from .mc_guess_data_hard import (
     VERSION_ORDER_HARD,
     check_hard_data,
     find_hard_item,
+    version_label,
 )
 
 # --------------------------------------------------------------------------
@@ -51,7 +53,7 @@ FILE_LOG = "[弗一把]"
 MAX_ROUNDS = 20                 # 一局总共能猜几次（全群共享）
 SESSION_TTL = 10 * 60.0         # 十分钟没人动就散场
 
-# 两种难度：简单 = 原来的 1.20.2 题库；困难 = 26.1 及以前的全部物品与生物。
+# 两种难度：简单 = 原来的 1.20.2 题库；困难 = 26.3 及以前的全部物品与生物。
 MODE_EASY, MODE_HARD = "简单", "困难"
 MODE_LABELS = {MODE_EASY: "简单模式", MODE_HARD: "困难模式"}
 MODE_BANKS = {
@@ -67,7 +69,7 @@ MODE_BANKS = {
         "order": VERSION_ORDER_HARD,
         "find": find_hard_item,
         "check": check_hard_data,
-        "scope": "26.1 及以前的全部物品和生物（1.21.x 和 26.1 的新内容都在里面）",
+        "scope": "26.3 及以前的全部物品和生物（1.21.x 和 26.x 的新内容都在里面）",
     },
 }
 
@@ -521,11 +523,12 @@ class MCGuess:
     @staticmethod
     def _version_cell(guess: Item, target: Item, order=None) -> str:
         newer = version_newer(guess.version, target.version, order)
+        label = version_label(guess.version)
         if newer == 0:
-            return f"{GREEN} {guess.version}"
+            return f"{GREEN} {label}"
         if newer < 0:
-            return f"{UP} 答案比「{guess.version}」新"
-        return f"{DOWN} 答案比「{guess.version}」旧"
+            return f"{UP} 答案比「{label}」新"
+        return f"{DOWN} 答案比「{label}」旧"
 
     @staticmethod
     def _type_cell(guess: Item, target: Item) -> str:

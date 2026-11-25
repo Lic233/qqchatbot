@@ -62,6 +62,7 @@ from .mc_guess_data import (
 from .mc_guess_data_hard import (
     HARD_ITEMS as MC_HARD_ITEMS,
     VERSION_ORDER_HARD,
+    version_label,
     check_hard_data,
     find_hard_item,
 )
@@ -249,10 +250,13 @@ async def selftest() -> int:
     print("== AI 对话 ==")
     ai_calls: list[tuple[str, str]] = []
     image_calls: list[list] = []
+    ai_tools: dict = {}
 
-    async def fake_chat(system: str, text: str, images=None) -> str:
+    async def fake_chat(system: str, text: str, images=None, **kwargs) -> str:
         ai_calls.append((system, text))
         image_calls.append(list(images or []))
+        ai_tools.clear()
+        ai_tools.update(kwargs)
         return "收到：" + text
 
     handler.chat = fake_chat
@@ -274,29 +278,73 @@ async def selftest() -> int:
     expect("@ + 命令仍走命令（不进 AI）", not ai_calls and bool(sender.events))
     expect("@ + 命令有保存回复", sender.events[0][0] == "text")
 
-    # 记忆按人分开：第二次对话能带上第一次的内容
+    # 记忆按群共享：第二次对话能带上群里的上一次内容
     sender.events.clear()
     ai_calls.clear()
     await feed("我刚说了什么", mentioned=True)
     expect("记忆带进提示词", bool(ai_calls) and "你好呀" in ai_calls[0][0])
 
-    # 换个用户就看不到别人的记忆
+    # 换个人也看得到群里刚才聊的（同一个群共享），但要知道是谁说的
     sender.events.clear()
     ai_calls.clear()
     await handler.handle(Incoming(group_openid="G1", user_openid="U2", username="另一个人",
                                   content="你好呀", msg_id="m4", mentioned=True))
-    expect("别人的记忆不串进来", bool(ai_calls) and "我刚说了什么" not in ai_calls[0][0])
+    expect("群内共享：别人的对话也带进来",
+           bool(ai_calls) and "我刚说了什么" in ai_calls[0][0])
+    expect("别人的行不带 → 标记",
+           bool(ai_calls) and "\n[测试]" in ai_calls[0][0]
+           and "→[测试]" not in ai_calls[0][0])
 
-    # 忘掉我：清空自己的记忆
+    # 同一个人再说一句：他这个人的行会被标成「正在和你说话」
     sender.events.clear()
-    await feed("忘掉我", mentioned=False, msg_id="m5")
-    expect("忘掉我 有回复", bool(sender.events) and sender.events[0][0] == "text")
-    expect("忘掉我 真的清了", handler.memory.transcript("G1", "U1") == "")
+    ai_calls.clear()
+    await handler.handle(Incoming(group_openid="G1", user_openid="U2", username="另一个人",
+                                  content="我又是谁", msg_id="m5", mentioned=True))
+    expect("正在对话的人的行首有 →",
+           bool(ai_calls) and "→[另一个人]" in ai_calls[0][0])
+    expect("提示词说清 → 表示正在对话的人",
+           bool(ai_calls) and "行首带 →" in ai_calls[0][0])
+
+    # 记忆库：模型自己判断记不记，写进去的东西下一轮会进提示词
+    remember = ai_tools.get("remember")
+    expect("记忆库工具交给了模型", callable(remember))
+    if callable(remember):
+        await remember("毕设做的是太赫兹超材料传感器", "")
+        notes = handler.memory_bank.notes("G1")
+        expect("记忆库真的写进去了",
+               any("太赫兹" in str(note.get("text")) for note in notes))
+        expect("默认记在当前说话人名下",
+               any(note.get("about") == "另一个人" for note in notes))
+        expect("重复的同一句不再记",
+               (await remember("毕设做的是太赫兹超材料传感器", "")).startswith("这条已经记过"))
+        expect("重复后条数没涨", len(handler.memory_bank.notes("G1")) == len(notes))
+        await remember("怕辣", "测试")
+        expect("可以记到别人名下",
+               any(note.get("about") == "测试" for note in handler.memory_bank.notes("G1")))
+        await remember("群里不刷屏", "查无此人")
+        expect("认不出的人就记成群级的",
+               any(note.get("about") == "" and "不刷屏" in str(note.get("text"))
+                   for note in handler.memory_bank.notes("G1")))
+
+        sender.events.clear()
+        ai_calls.clear()
+        await handler.handle(Incoming(group_openid="G1", user_openid="U1", username="测试",
+                                      content="我毕设是啥", msg_id="m5c", mentioned=True))
+        expect("记忆库进了下一轮提示词",
+               bool(ai_calls) and "太赫兹" in ai_calls[0][0])
+
+    # 「忘掉我」功能已删除：这句话现在只是普通闲聊，不回复、也不动群里的记录
+    sender.events.clear()
+    ai_calls.clear()
+    await feed("忘掉我", mentioned=False, msg_id="m6")
+    expect("忘掉我 不再有专门回复", sender.events == [] and not ai_calls)
+    expect("忘掉我 不动群里的对话",
+           "我又是谁" in handler.memory.transcript("G1", "U1"))
 
     # 长回复自动分条
     sender.events.clear()
 
-    async def long_chat(system: str, text: str, images=None) -> str:
+    async def long_chat(system: str, text: str, images=None, **kwargs) -> str:
         return "第一段。" * 400
 
     handler.chat = long_chat
@@ -308,7 +356,7 @@ async def selftest() -> int:
     # AI 失败要兜底，不能把异常抛出去
     sender.events.clear()
 
-    async def broken_chat(system: str, text: str, images=None) -> str:
+    async def broken_chat(system: str, text: str, images=None, **kwargs) -> str:
         raise RuntimeError("模拟 DeepSeek 挂了")
 
     handler.chat = broken_chat
@@ -778,10 +826,84 @@ async def selftest() -> int:
         ),
     )
 
+    # 两句空话的判定：放话去搜算，已经在讲结果的不算
+    expect("「我去搜搜」算放话", looks_like_search_promise("等我一下，我去搜搜"))
+    expect("「得查一下最近的赛程」算放话",
+           looks_like_search_promise("诶……肘赢？你是说谁把 Faker 打了吧。\n\n这个我不能靠猜，得查一下最近的赛"))
+    expect("「让我查一下」算放话", looks_like_search_promise("让我查一下"))
+    expect("已经在讲结果的不算", not looks_like_search_promise("我查了一下，确实是 3:1"))
+    expect("正常短回答不算", not looks_like_search_promise("好呀，那明天见"))
+    expect("长回复不算（有正文）",
+           not looks_like_search_promise("我去搜搜" + "，顺便说一句" * 10))
+
+    class PromiseThenSearch(DeepSeek):
+        """第一轮只放话不调工具：要被催一次，然后真的去查。"""
+
+        def __init__(self) -> None:
+            super().__init__("test-key")
+            self.requests: list[dict] = []
+
+        async def _complete(self, payload: dict) -> dict:
+            self.requests.append(payload)
+            if len(self.requests) == 1:
+                return {"content": "这个我得查一下最近的比赛"}
+            if len(self.requests) == 2:
+                return {"tool_calls": [{
+                    "id": "call-9",
+                    "type": "function",
+                    "function": {"name": "web_search",
+                                 "arguments": '{"query": "谁赢了 faker"}'},
+                }]}
+            return {"content": "查到了：是肘子赢了。"}
+
+    promised = PromiseThenSearch()
+    notes: list[str] = []
+
+    async def on_search(query: str) -> None:
+        notes.append(query)
+
+    promised_searches: list[str] = []
+
+    async def promised_search(query: str) -> list[SearchResult]:
+        promised_searches.append(query)
+        return [SearchResult("赛果", "https://example.com/1", "肘子 3:1 Faker")]
+
+    promised_reply = await promised.answer(
+        "系统提示", "谁肘赢了faker", search=promised_search, on_search=on_search,
+    )
+    expect("只放话会被催着真去查", promised_searches == ["谁赢了 faker"])
+    expect("催完拿到的是答案不是那句空话", promised_reply.startswith("查到了"))
+    expect("催查只插了一条提示", len(notes) == 1)
+    expect("催查第二轮带上了提醒",
+           any("别只说要查" in str(message.get("content"))
+               for message in promised.requests[1]["messages"]))
+
+    # 联网时先单独发一句提示，第二条才是答案
+    handler.search = fake_search
+    sender.events.clear()
+
+    async def notify_chat(system: str, text: str, images=None, search=None,
+                          on_search=None, **kwargs) -> str:
+        if callable(on_search):
+            await on_search("今天的新闻")
+        return "查到了：今天没什么大事。"
+
+    handler.chat = notify_chat
+    await feed("今天有什么新闻", mentioned=True, msg_id="m7c")
+    expect("开搜时一共发两条", len(sender.events) == 2)
+    expect("第一条是搜索提示",
+           bool(sender.events) and sender.events[0][0] == "text"
+           and sender.events[0][1] in SEARCH_NOTICE_LINES)
+    expect("第二条才是答案",
+           len(sender.events) == 2 and sender.events[1][1].startswith("查到了"))
+    handler.search = None
+    handler.chat = fake_chat
+
     handler.search = fake_search
     search_seen: dict = {}
 
-    async def search_chat(system: str, text: str, images=None, search=None) -> str:
+    async def search_chat(system: str, text: str, images=None, search=None,
+                          **kwargs) -> str:
         search_seen["system"] = system
         search_seen["search"] = search
         return "好"
@@ -797,7 +919,7 @@ async def selftest() -> int:
     print("== 识图 ==")
     seen: dict = {}
 
-    async def vision_chat(system: str, text: str, images=None) -> str:
+    async def vision_chat(system: str, text: str, images=None, **kwargs) -> str:
         seen["system"] = system
         seen["text"] = text
         seen["images"] = list(images or [])
@@ -1598,8 +1720,76 @@ async def selftest() -> int:
         speaker_profile=profiles.summary_of("G1", "U9"),
     )
     expect("提示词带画像", "省略号" in prompt_with_profile)
-    expect("忘掉我清画像", profiles.forget("G1", "U9"))
-    expect("清完就没了", profiles.summary_of("G1", "U9") == "")
+
+    print("== 记忆库 ==")
+    bank = MemoryBank(temporary)
+    expect("空库拼出来是空串", bank.prompt_for("G2") == "")
+    expect("记一条", bank.add("G2", "周四晚上打本", about="初春", about_id="U1"))
+    expect("同一个人重复内容不再记",
+           not bank.add("G2", "周四晚上打本", about="初春", about_id="U1"))
+    expect("同一句话记到别人名下算新的",
+           bank.add("G2", "周四晚上打本", about="庞月", about_id="U2"))
+    expect("群级记录不带「关于谁」", bank.add("G2", "周五固定开黑"))
+    notes_text = bank.prompt_for("G2")
+    expect("提示词标出是谁的事", "[关于初春] 周四晚上打本" in notes_text)
+    expect("群级记录标成「群里的」", "[群里的] 周五固定开黑" in notes_text)
+    expect("按时间先后排", notes_text.index("初春") < notes_text.index("群里的"))
+
+    reloaded = MemoryBank(temporary)
+    expect("落盘后新实例读得到", len(reloaded.notes("G2")) == len(bank.notes("G2")))
+    capped = MemoryBank(temporary, limit=1)
+    expect("条数上限只留最新的", [n["text"] for n in capped.notes("G2")] == ["周五固定开黑"])
+
+    notes_for_prompt = build_system_prompt("测试人设", memory_notes=notes_text)
+    expect("提示词里有记忆库段落", "【记忆库】" in notes_for_prompt)
+
+    print("== 记忆库工具（模型自己写）==")
+
+    class ScriptedDeepSeek(DeepSeek):
+        """把 _complete 换掉，离线演练「调 remember → 再作答」这条链。"""
+
+        def __init__(self) -> None:
+            super().__init__("fake-key")
+            self.payloads: list[dict] = []
+
+        async def _complete(self, payload: dict) -> dict:
+            self.payloads.append(payload)
+            names = [
+                str((tool.get("function") or {}).get("name") or "")
+                for tool in payload.get("tools") or []
+            ]
+            if "remember" in names:
+                return {"tool_calls": [{
+                    "id": "call-1",
+                    "type": "function",
+                    "function": {
+                        "name": "remember",
+                        "arguments": '{"content": "喜欢无糖可乐", "about": "初春"}',
+                    },
+                }]}
+            return {"content": "好，记下了。"}
+
+    written: list[tuple[str, str]] = []
+
+    async def fake_remember(content: str, about: str) -> str:
+        written.append((content, about))
+        return "记下了。"
+
+    scripted = ScriptedDeepSeek()
+    reply = await scripted.answer("系统", "我叫初春，喜欢无糖可乐", remember=fake_remember)
+    expect("调完 remember 还能正常作答", reply == "好，记下了。")
+    expect("remember 参数解析对了", written == [("喜欢无糖可乐", "初春")])
+    expect("没开搜索时只给记忆工具",
+           [t["function"]["name"] for t in scripted.payloads[0].get("tools") or []]
+           == ["remember"])
+    expect("最后一轮撤掉工具", not (scripted.payloads[-1].get("tools") or []))
+
+    async def broken_remember(content: str, about: str) -> str:
+        raise RuntimeError("模拟写盘失败")
+
+    scripted = ScriptedDeepSeek()
+    reply = await scripted.answer("系统", "我叫初春", remember=broken_remember)
+    expect("记忆写失败也不耽误回答", reply == "好，记下了。")
 
     print("== 功能列表 / 更新日志 ==")
     long_text = "第一行内容" + chr(10) + ("填充" * 40) + chr(10) + "最后一行"
@@ -3000,7 +3190,7 @@ async def selftest() -> int:
            and find_item("淡蓝色陶瓦").name == "陶瓦")
     expect("乱七八糟的输入查不到", find_item("这个物品不存在喵") is None)
 
-    # ---- 困难模式题库（到 26.1 为止）----
+    # ---- 困难模式题库（到 26.3 为止）----
     expect("困难题库自检全过", check_hard_data() == [])
     expect("题库扩到 800 件以上", len(MC_HARD_ITEMS) >= 800)
     expect("困难题库把简单题库整个包进去",
@@ -3008,11 +3198,11 @@ async def selftest() -> int:
     expect("1.21 的新东西都在困难题库里",
            all(find_hard_item(name) is not None for name in
                ("重锤", "风弹", "铜灯", "试炼钥匙", "犰狳", "沼骸")))
-    expect("1.20.5 到 26.1 每个版本都有新内容",
+    expect("1.20.5 到 26.3 每个版本都有新内容",
            all(any(item.version == version for item in MC_HARD_ITEMS)
                for version in ("1.20.5", "1.21", "1.21.2", "1.21.4",
                                "1.21.5", "1.21.6", "1.21.9", "1.21.11",
-                               "26.1")))
+                               "26.1", "26.2", "26.3")))
     expect("困难档位接在简单档位后面",
            VERSION_ORDER_HARD[:len(VERSION_ORDER)] == VERSION_ORDER
            and len(VERSION_ORDER_HARD) > len(VERSION_ORDER))
@@ -3044,9 +3234,28 @@ async def selftest() -> int:
            find_hard_item("鸡蛋").name == "蛋"
            and find_hard_item("蓝色鸡蛋").name == "蛋"
            and find_hard_item("棕色鸡蛋").name == "蛋")
-    expect("每道题都有正数权值（现在全是 1）",
-           all(getattr(item, "weight", 0) == 1 for item in MC_ITEMS)
-           and all(getattr(item, "weight", 0) == 1 for item in MC_HARD_ITEMS))
+    family_suffix = ("楼梯", "台阶", "告示牌", "栅栏", "栅栏门", "墙",
+                     "活板门", "按钮", "压力板", "门", "船", "筏")
+    expect("楼梯 / 台阶 / 告示牌 / 栅栏 / 墙 / 门 / 按钮 / 船这些族系权重是 0.3",
+           find_item("橡木楼梯").weight == 0.3
+           and find_item("石头台阶").weight == 0.3
+           and find_item("橡木栅栏门").weight == 0.3
+           and find_item("圆石墙").weight == 0.3
+           and find_item("橡木告示牌").weight == 0.3
+           and find_item("橡木门").weight == 0.3
+           and find_item("橡木活板门").weight == 0.3
+           and find_item("橡木按钮").weight == 0.3
+           and find_item("橡木压力板").weight == 0.3
+           and find_item("橡木船").weight == 0.3
+           and find_item("竹筏").weight == 0.3
+           and all(item.weight == 0.3 for item in MC_HARD_ITEMS
+                   if item.name.endswith(family_suffix)))
+    expect("族系之外还是 1（没有误伤别的题）",
+           all(item.weight == 1 for item in MC_ITEMS
+               if not item.name.endswith(family_suffix))
+           and all(item.weight == 1 for item in MC_HARD_ITEMS
+                   if not item.name.endswith(family_suffix))
+           and find_item("钻石剑").weight == 1)
     mc_light = MC_Item("轻题", "远古", "方块", ("地形",), "无", note="x")
     mc_heavy = MC_Item("重题", "远古", "方块", ("地形",), "无", note="x",
                        weight=9)
@@ -3153,6 +3362,12 @@ async def selftest() -> int:
     expect("答案更早的版本亮 ⬇️",
            MCGuess._cells(find_item("下界合金剑"), find_item("铁剑"))[1]
            .startswith("⬇️"))
+    expect("版本反馈带更新主题名",
+           MCGuess._cells(find_item("下界合金锭"), find_item("下界合金剑"))[1]
+           == "🟩 1.16 下界更新"
+           and version_label("1.13") == "1.13 水域更新"
+           and version_label("26.1") == "26.1 小鬼当家"
+           and version_label("远古") == "远古")
 
     # ---- 对局：难度面板 / 猜错 / 去重 / 猜中结算 ----
     handler.mc_guess.clear()
@@ -3178,7 +3393,7 @@ async def selftest() -> int:
     await mc("弗一把")
     expect("「弗一把」先给难度面板",
            "简单模式" in mc_text() and "困难模式" in mc_text()
-           and "26.1" in mc_text())
+           and "26.3" in mc_text())
     panel = sender.panels[-1] if sender.panels else []
     labels = [button["render_data"]["label"]
               for row in panel for button in row["buttons"]]
@@ -3343,7 +3558,7 @@ async def selftest() -> int:
     handler.mc_guess._pick = lambda *args, **kwargs: find_hard_item("重锤")
     await mc_start(user="MCH1", name="阿曼", group="G-HARD", mode="困难")
     expect("困难模式开局写明范围和难度",
-           "困难模式" in mc_text() and "26.1" in mc_text())
+           "困难模式" in mc_text() and "26.3" in mc_text())
     expect("这一局记着是困难模式",
            handler.mc_guess.active("G-HARD").mode == "困难")
     await mc("猜 下界合金剑", user="MCH2", name="庞月", group="G-HARD")
@@ -3351,7 +3566,7 @@ async def selftest() -> int:
            "题库里没有" not in mc_text()
            and "还剩 19 次" in mc_text())
     expect("新版本打 ⬆️ 而不是不认识",
-           "答案比「1.16」新" in mc_text())
+           "答案比「1.16 下界更新」新" in mc_text())
     await mc("重锤", user="MCH2", name="庞月", group="G-HARD")
     expect("困难模式猜中新物品算中",
            "猜中" in mc_text() and "重锤" in mc_text())

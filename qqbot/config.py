@@ -95,6 +95,14 @@ SEARCH_CONTEXT_LIMIT = int(
     os.getenv("QQCHATBOT_SEARCH_CONTEXT", "").strip() or 4000
 )
 
+# 真的要联网时，先单独发一句提示，第二条才是答案（不然群里只看到一句
+# "我去搜搜"就没下文了，用户还得追问一次）。随机挑一句，别每次都一样。
+SEARCH_NOTICE_LINES = (
+    "等我一下，我去网上翻翻～",
+    "诶这个我得查查，稍等～",
+    "让我搜一下，马上回来～",
+)
+
 # 人设由 data/persona.txt 维护，改完立刻生效（每次请求都重读），不用重启。
 PERSONA_FILE = config_file("persona.txt")
 
@@ -135,9 +143,22 @@ HARD_RULES = (
     "也不要拿对方当笑点；对方情绪低落、正经求助或话题严肃时一句玩笑都不要。"
 )
 
-# 记忆：每个 (群, 人) 各留最近这么多条，只装这个人和机器人的对话。
+# 记忆：每个群留最近这么多条（群里 @ 对话的提问 + 机器人的回复），按群共享。
+# 上下文里会标出正在对话的人，所以共享也不会把别人的话当成他说的。
 MEMORY_RECENT = int(os.getenv("QQCHATBOT_MEMORY_RECENT", "").strip() or 20)
 MEMORY_CHARS = int(os.getenv("QQCHATBOT_MEMORY_CHARS", "").strip() or 1200)
+
+# 记忆库：模型自己在对话中判断「以后还用得上」就写进来的长期记忆，落盘不丢。
+# 和上面的短期记忆分开放：短期是原话，这里是模型消化过的一句话事实。
+MEMORY_BANK_ENABLED = os.getenv("QQCHATBOT_MEMORY_BANK", "").strip().lower() not in {
+    "0", "false", "no", "off",
+}
+# 每群最多留多少条（超了丢最旧的）、单条最多多少字、一次塞进提示词多少字。
+MEMORY_BANK_MAX = int(os.getenv("QQCHATBOT_MEMORY_BANK_MAX", "").strip() or 200)
+MEMORY_BANK_NOTE_CHARS = int(os.getenv("QQCHATBOT_MEMORY_BANK_NOTE", "").strip() or 200)
+MEMORY_BANK_CONTEXT = int(
+    os.getenv("QQCHATBOT_MEMORY_BANK_CONTEXT", "").strip() or 1500
+)
 
 # 官方文本消息有长度上限，长回复按段切开分条发。
 REPLY_CHUNK_CHARS = int(os.getenv("QQCHATBOT_REPLY_CHUNK", "").strip() or 800)

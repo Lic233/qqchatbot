@@ -1,6 +1,26 @@
 {
   "_comment": "弗一把 · 简单模式题库（Java 1.20.2 截止）。改题只动这里；colored=true 会自动补 16 色别名；weight 是抽题权重（默认 1，越大越容易抽到）。",
   "version_order": ["远古", "1.0", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7", "1.8", "1.9", "1.10", "1.11", "1.12", "1.13", "1.14", "1.15", "1.16", "1.17", "1.19", "1.20", "1.20.2"],
+  "version_names": {
+    "1.0": "冒险更新",
+    "1.4": "骇人更新",
+    "1.5": "红石更新",
+    "1.6": "马匹更新",
+    "1.7": "改变世界的更新",
+    "1.8": "缤纷更新",
+    "1.9": "战斗更新",
+    "1.10": "霜炙更新",
+    "1.11": "探险更新",
+    "1.12": "多彩世界更新",
+    "1.13": "水域更新",
+    "1.14": "村庄与掠夺",
+    "1.15": "嗡嗡蜂群",
+    "1.16": "下界更新",
+    "1.17": "洞穴与山崖",
+    "1.19": "荒野更新",
+    "1.20": "足迹与故事",
+    "1.20.2": "足迹与故事"
+  },
   "types": ["方块", "工具", "武器", "防具", "食物", "材料", "红石", "特殊", "药水", "生物"],
   "tags": ["木材", "石材", "金属", "宝石", "生物", "植物", "矿物", "皮革", "地形", "建筑", "装饰", "照明", "红石", "存储", "交通", "战斗", "采集", "烹饪", "酿造", "食物", "燃料", "稀有", "可染色", "被动", "中立", "敌对", "可驯服", "亡灵"],
   "worlds": ["主世界", "下界", "末地", "无"],
@@ -2086,7 +2106,7 @@
       "name": "竹筏", "version": "1.20", "type": "工具",
       "tags": ["植物", "交通"], "world": "无",
       "note": "竹子做的船，划起来一样快。",
-      "aliases": ["bamboo_raft"], "weight": 1
+      "aliases": ["bamboo_raft"], "weight": 0.3
     },
     {
       "name": "地图", "version": "远古", "type": "工具",
@@ -2164,853 +2184,853 @@
       "name": "橡木楼梯", "version": "远古", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "橡木做的楼梯。铺楼梯用的。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "橡木台阶", "version": "远古", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "橡木做的台阶。半砖，铺路好看。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "橡木栅栏", "version": "远古", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "橡木做的栅栏。圈养动物必备。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "橡木栅栏门", "version": "远古", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "橡木做的栅栏门。能开能关的栅栏。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "橡木门", "version": "远古", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "橡木做的门。装在家里，晚上关好。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "橡木活板门", "version": "远古", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "橡木做的活板门。地板上的小门。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "橡木告示牌", "version": "远古", "type": "方块",
       "tags": ["木材", "装饰"], "world": "无",
       "note": "橡木做的告示牌。写点东西挂墙上。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "橡木按钮", "version": "远古", "type": "方块",
       "tags": ["木材", "红石"], "world": "无",
       "note": "橡木做的按钮。按一下发个短信号。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "橡木压力板", "version": "远古", "type": "方块",
       "tags": ["木材", "红石"], "world": "无",
       "note": "橡木做的压力板。踩上去就通电。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "云杉木楼梯", "version": "远古", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "云杉木做的楼梯。铺楼梯用的。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "云杉木台阶", "version": "远古", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "云杉木做的台阶。半砖，铺路好看。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "云杉木栅栏", "version": "远古", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "云杉木做的栅栏。圈养动物必备。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "云杉木栅栏门", "version": "远古", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "云杉木做的栅栏门。能开能关的栅栏。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "云杉木门", "version": "远古", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "云杉木做的门。装在家里，晚上关好。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "云杉木活板门", "version": "远古", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "云杉木做的活板门。地板上的小门。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "云杉木告示牌", "version": "远古", "type": "方块",
       "tags": ["木材", "装饰"], "world": "无",
       "note": "云杉木做的告示牌。写点东西挂墙上。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "云杉木按钮", "version": "远古", "type": "方块",
       "tags": ["木材", "红石"], "world": "无",
       "note": "云杉木做的按钮。按一下发个短信号。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "云杉木压力板", "version": "远古", "type": "方块",
       "tags": ["木材", "红石"], "world": "无",
       "note": "云杉木做的压力板。踩上去就通电。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "白桦木楼梯", "version": "远古", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "白桦木做的楼梯。铺楼梯用的。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "白桦木台阶", "version": "远古", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "白桦木做的台阶。半砖，铺路好看。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "白桦木栅栏", "version": "远古", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "白桦木做的栅栏。圈养动物必备。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "白桦木栅栏门", "version": "远古", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "白桦木做的栅栏门。能开能关的栅栏。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "白桦木门", "version": "远古", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "白桦木做的门。装在家里，晚上关好。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "白桦木活板门", "version": "远古", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "白桦木做的活板门。地板上的小门。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "白桦木告示牌", "version": "远古", "type": "方块",
       "tags": ["木材", "装饰"], "world": "无",
       "note": "白桦木做的告示牌。写点东西挂墙上。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "白桦木按钮", "version": "远古", "type": "方块",
       "tags": ["木材", "红石"], "world": "无",
       "note": "白桦木做的按钮。按一下发个短信号。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "白桦木压力板", "version": "远古", "type": "方块",
       "tags": ["木材", "红石"], "world": "无",
       "note": "白桦木做的压力板。踩上去就通电。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "丛林木楼梯", "version": "1.2", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "丛林木做的楼梯。铺楼梯用的。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "丛林木台阶", "version": "1.2", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "丛林木做的台阶。半砖，铺路好看。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "丛林木栅栏", "version": "1.2", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "丛林木做的栅栏。圈养动物必备。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "丛林木栅栏门", "version": "1.2", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "丛林木做的栅栏门。能开能关的栅栏。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "丛林木门", "version": "1.2", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "丛林木做的门。装在家里，晚上关好。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "丛林木活板门", "version": "1.2", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "丛林木做的活板门。地板上的小门。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "丛林木告示牌", "version": "1.2", "type": "方块",
       "tags": ["木材", "装饰"], "world": "无",
       "note": "丛林木做的告示牌。写点东西挂墙上。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "丛林木按钮", "version": "1.2", "type": "方块",
       "tags": ["木材", "红石"], "world": "无",
       "note": "丛林木做的按钮。按一下发个短信号。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "丛林木压力板", "version": "1.2", "type": "方块",
       "tags": ["木材", "红石"], "world": "无",
       "note": "丛林木做的压力板。踩上去就通电。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "金合欢木楼梯", "version": "1.7", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "金合欢木做的楼梯。铺楼梯用的。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "金合欢木台阶", "version": "1.7", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "金合欢木做的台阶。半砖，铺路好看。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "金合欢木栅栏", "version": "1.7", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "金合欢木做的栅栏。圈养动物必备。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "金合欢木栅栏门", "version": "1.7", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "金合欢木做的栅栏门。能开能关的栅栏。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "金合欢木门", "version": "1.7", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "金合欢木做的门。装在家里，晚上关好。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "金合欢木活板门", "version": "1.7", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "金合欢木做的活板门。地板上的小门。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "金合欢木告示牌", "version": "1.7", "type": "方块",
       "tags": ["木材", "装饰"], "world": "无",
       "note": "金合欢木做的告示牌。写点东西挂墙上。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "金合欢木按钮", "version": "1.7", "type": "方块",
       "tags": ["木材", "红石"], "world": "无",
       "note": "金合欢木做的按钮。按一下发个短信号。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "金合欢木压力板", "version": "1.7", "type": "方块",
       "tags": ["木材", "红石"], "world": "无",
       "note": "金合欢木做的压力板。踩上去就通电。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "深色橡木楼梯", "version": "1.7", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "深色橡木做的楼梯。铺楼梯用的。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "深色橡木台阶", "version": "1.7", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "深色橡木做的台阶。半砖，铺路好看。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "深色橡木栅栏", "version": "1.7", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "深色橡木做的栅栏。圈养动物必备。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "深色橡木栅栏门", "version": "1.7", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "深色橡木做的栅栏门。能开能关的栅栏。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "深色橡木门", "version": "1.7", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "深色橡木做的门。装在家里，晚上关好。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "深色橡木活板门", "version": "1.7", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "深色橡木做的活板门。地板上的小门。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "深色橡木告示牌", "version": "1.7", "type": "方块",
       "tags": ["木材", "装饰"], "world": "无",
       "note": "深色橡木做的告示牌。写点东西挂墙上。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "深色橡木按钮", "version": "1.7", "type": "方块",
       "tags": ["木材", "红石"], "world": "无",
       "note": "深色橡木做的按钮。按一下发个短信号。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "深色橡木压力板", "version": "1.7", "type": "方块",
       "tags": ["木材", "红石"], "world": "无",
       "note": "深色橡木做的压力板。踩上去就通电。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "红树木楼梯", "version": "1.19", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "红树木做的楼梯。铺楼梯用的。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "红树木台阶", "version": "1.19", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "红树木做的台阶。半砖，铺路好看。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "红树木栅栏", "version": "1.19", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "红树木做的栅栏。圈养动物必备。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "红树木栅栏门", "version": "1.19", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "红树木做的栅栏门。能开能关的栅栏。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "红树木门", "version": "1.19", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "红树木做的门。装在家里，晚上关好。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "红树木活板门", "version": "1.19", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "红树木做的活板门。地板上的小门。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "红树木告示牌", "version": "1.19", "type": "方块",
       "tags": ["木材", "装饰"], "world": "无",
       "note": "红树木做的告示牌。写点东西挂墙上。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "红树木按钮", "version": "1.19", "type": "方块",
       "tags": ["木材", "红石"], "world": "无",
       "note": "红树木做的按钮。按一下发个短信号。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "红树木压力板", "version": "1.19", "type": "方块",
       "tags": ["木材", "红石"], "world": "无",
       "note": "红树木做的压力板。踩上去就通电。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "樱花木楼梯", "version": "1.20", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "樱花木做的楼梯。铺楼梯用的。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "樱花木台阶", "version": "1.20", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "樱花木做的台阶。半砖，铺路好看。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "樱花木栅栏", "version": "1.20", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "樱花木做的栅栏。圈养动物必备。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "樱花木栅栏门", "version": "1.20", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "樱花木做的栅栏门。能开能关的栅栏。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "樱花木门", "version": "1.20", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "樱花木做的门。装在家里，晚上关好。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "樱花木活板门", "version": "1.20", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "樱花木做的活板门。地板上的小门。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "樱花木告示牌", "version": "1.20", "type": "方块",
       "tags": ["木材", "装饰"], "world": "无",
       "note": "樱花木做的告示牌。写点东西挂墙上。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "樱花木按钮", "version": "1.20", "type": "方块",
       "tags": ["木材", "红石"], "world": "无",
       "note": "樱花木做的按钮。按一下发个短信号。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "樱花木压力板", "version": "1.20", "type": "方块",
       "tags": ["木材", "红石"], "world": "无",
       "note": "樱花木做的压力板。踩上去就通电。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "竹楼梯", "version": "1.20", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "竹做的楼梯。铺楼梯用的。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "竹台阶", "version": "1.20", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "竹做的台阶。半砖，铺路好看。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "竹栅栏", "version": "1.20", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "竹做的栅栏。圈养动物必备。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "竹栅栏门", "version": "1.20", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "竹做的栅栏门。能开能关的栅栏。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "竹门", "version": "1.20", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "竹做的门。装在家里，晚上关好。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "竹活板门", "version": "1.20", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "竹做的活板门。地板上的小门。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "竹告示牌", "version": "1.20", "type": "方块",
       "tags": ["木材", "装饰"], "world": "无",
       "note": "竹做的告示牌。写点东西挂墙上。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "竹按钮", "version": "1.20", "type": "方块",
       "tags": ["木材", "红石"], "world": "无",
       "note": "竹做的按钮。按一下发个短信号。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "竹压力板", "version": "1.20", "type": "方块",
       "tags": ["木材", "红石"], "world": "无",
       "note": "竹做的压力板。踩上去就通电。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "绯红木楼梯", "version": "1.16", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "绯红木做的楼梯。铺楼梯用的。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "绯红木台阶", "version": "1.16", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "绯红木做的台阶。半砖，铺路好看。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "绯红木栅栏", "version": "1.16", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "绯红木做的栅栏。圈养动物必备。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "绯红木栅栏门", "version": "1.16", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "绯红木做的栅栏门。能开能关的栅栏。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "绯红木门", "version": "1.16", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "绯红木做的门。装在家里，晚上关好。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "绯红木活板门", "version": "1.16", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "绯红木做的活板门。地板上的小门。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "绯红木告示牌", "version": "1.16", "type": "方块",
       "tags": ["木材", "装饰"], "world": "无",
       "note": "绯红木做的告示牌。写点东西挂墙上。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "绯红木按钮", "version": "1.16", "type": "方块",
       "tags": ["木材", "红石"], "world": "无",
       "note": "绯红木做的按钮。按一下发个短信号。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "绯红木压力板", "version": "1.16", "type": "方块",
       "tags": ["木材", "红石"], "world": "无",
       "note": "绯红木做的压力板。踩上去就通电。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "诡异木楼梯", "version": "1.16", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "诡异木做的楼梯。铺楼梯用的。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "诡异木台阶", "version": "1.16", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "诡异木做的台阶。半砖，铺路好看。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "诡异木栅栏", "version": "1.16", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "诡异木做的栅栏。圈养动物必备。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "诡异木栅栏门", "version": "1.16", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "诡异木做的栅栏门。能开能关的栅栏。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "诡异木门", "version": "1.16", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "诡异木做的门。装在家里，晚上关好。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "诡异木活板门", "version": "1.16", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "诡异木做的活板门。地板上的小门。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "诡异木告示牌", "version": "1.16", "type": "方块",
       "tags": ["木材", "装饰"], "world": "无",
       "note": "诡异木做的告示牌。写点东西挂墙上。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "诡异木按钮", "version": "1.16", "type": "方块",
       "tags": ["木材", "红石"], "world": "无",
       "note": "诡异木做的按钮。按一下发个短信号。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "诡异木压力板", "version": "1.16", "type": "方块",
       "tags": ["木材", "红石"], "world": "无",
       "note": "诡异木做的压力板。踩上去就通电。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "橡木船", "version": "远古", "type": "工具",
       "tags": ["木材", "交通"], "world": "无",
       "note": "橡木做的船，过河、跑图都能用。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "云杉木船", "version": "远古", "type": "工具",
       "tags": ["木材", "交通"], "world": "无",
       "note": "云杉木做的船，过河、跑图都能用。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "白桦木船", "version": "远古", "type": "工具",
       "tags": ["木材", "交通"], "world": "无",
       "note": "白桦木做的船，过河、跑图都能用。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "丛林木船", "version": "1.2", "type": "工具",
       "tags": ["木材", "交通"], "world": "无",
       "note": "丛林木做的船，过河、跑图都能用。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "金合欢木船", "version": "1.7", "type": "工具",
       "tags": ["木材", "交通"], "world": "无",
       "note": "金合欢木做的船，过河、跑图都能用。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "深色橡木船", "version": "1.7", "type": "工具",
       "tags": ["木材", "交通"], "world": "无",
       "note": "深色橡木做的船，过河、跑图都能用。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "红树木船", "version": "1.19", "type": "工具",
       "tags": ["木材", "交通"], "world": "无",
       "note": "红树木做的船，过河、跑图都能用。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "樱花木船", "version": "1.20", "type": "工具",
       "tags": ["木材", "交通"], "world": "无",
       "note": "樱花木做的船，过河、跑图都能用。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "绯红木船", "version": "1.16", "type": "工具",
       "tags": ["木材", "交通"], "world": "无",
       "note": "绯红木做的船，过河、跑图都能用。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "诡异木船", "version": "1.16", "type": "工具",
       "tags": ["木材", "交通"], "world": "无",
       "note": "诡异木做的船，过河、跑图都能用。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "悬挂式橡木告示牌", "version": "1.20", "type": "方块",
       "tags": ["木材", "装饰"], "world": "无",
       "note": "橡木做的悬挂告示牌，能挂在天花板上。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "悬挂式云杉木告示牌", "version": "1.20", "type": "方块",
       "tags": ["木材", "装饰"], "world": "无",
       "note": "云杉木做的悬挂告示牌，能挂在天花板上。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "悬挂式白桦木告示牌", "version": "1.20", "type": "方块",
       "tags": ["木材", "装饰"], "world": "无",
       "note": "白桦木做的悬挂告示牌，能挂在天花板上。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "悬挂式丛林木告示牌", "version": "1.20", "type": "方块",
       "tags": ["木材", "装饰"], "world": "无",
       "note": "丛林木做的悬挂告示牌，能挂在天花板上。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "悬挂式金合欢木告示牌", "version": "1.20", "type": "方块",
       "tags": ["木材", "装饰"], "world": "无",
       "note": "金合欢木做的悬挂告示牌，能挂在天花板上。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "悬挂式深色橡木告示牌", "version": "1.20", "type": "方块",
       "tags": ["木材", "装饰"], "world": "无",
       "note": "深色橡木做的悬挂告示牌，能挂在天花板上。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "悬挂式红树木告示牌", "version": "1.20", "type": "方块",
       "tags": ["木材", "装饰"], "world": "无",
       "note": "红树木做的悬挂告示牌，能挂在天花板上。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "悬挂式樱花木告示牌", "version": "1.20", "type": "方块",
       "tags": ["木材", "装饰"], "world": "无",
       "note": "樱花木做的悬挂告示牌，能挂在天花板上。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "悬挂式竹告示牌", "version": "1.20", "type": "方块",
       "tags": ["木材", "装饰"], "world": "无",
       "note": "竹做的悬挂告示牌，能挂在天花板上。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "悬挂式绯红木告示牌", "version": "1.20", "type": "方块",
       "tags": ["木材", "装饰"], "world": "无",
       "note": "绯红木做的悬挂告示牌，能挂在天花板上。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "悬挂式诡异木告示牌", "version": "1.20", "type": "方块",
       "tags": ["木材", "装饰"], "world": "无",
       "note": "诡异木做的悬挂告示牌，能挂在天花板上。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "圆石墙", "version": "1.8", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "圆石砌的矮墙。",
-      "aliases": ["cobblestone_wall"], "weight": 1
+      "aliases": ["cobblestone_wall"], "weight": 0.3
     },
     {
       "name": "苔石墙", "version": "1.8", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "长满青苔的圆石墙。",
-      "aliases": ["mossy_cobblestone_wall"], "weight": 1
+      "aliases": ["mossy_cobblestone_wall"], "weight": 0.3
     },
     {
       "name": "石砖墙", "version": "1.8", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "石砖砌的墙。",
-      "aliases": ["stone_brick_wall"], "weight": 1
+      "aliases": ["stone_brick_wall"], "weight": 0.3
     },
     {
       "name": "苔石砖墙", "version": "1.8", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "长了青苔的石砖墙。",
-      "aliases": ["mossy_stone_brick_wall"], "weight": 1
+      "aliases": ["mossy_stone_brick_wall"], "weight": 0.3
     },
     {
       "name": "红砖墙", "version": "1.8", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "红砖砌的墙。",
-      "aliases": ["brick_wall"], "weight": 1
+      "aliases": ["brick_wall"], "weight": 0.3
     },
     {
       "name": "砂岩墙", "version": "1.8", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "砂岩砌的墙。",
-      "aliases": ["sandstone_wall"], "weight": 1
+      "aliases": ["sandstone_wall"], "weight": 0.3
     },
     {
       "name": "红砂岩墙", "version": "1.8", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "红砂岩砌的墙。",
-      "aliases": ["red_sandstone_wall"], "weight": 1
+      "aliases": ["red_sandstone_wall"], "weight": 0.3
     },
     {
       "name": "花岗岩墙", "version": "1.8", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "花岗岩砌的墙。",
-      "aliases": ["granite_wall"], "weight": 1
+      "aliases": ["granite_wall"], "weight": 0.3
     },
     {
       "name": "闪长岩墙", "version": "1.8", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "闪长岩砌的墙。",
-      "aliases": ["diorite_wall"], "weight": 1
+      "aliases": ["diorite_wall"], "weight": 0.3
     },
     {
       "name": "安山岩墙", "version": "1.8", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "安山岩砌的墙。",
-      "aliases": ["andesite_wall"], "weight": 1
+      "aliases": ["andesite_wall"], "weight": 0.3
     },
     {
       "name": "下界砖墙", "version": "1.8", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "下界砖砌的墙。",
-      "aliases": ["nether_brick_wall"], "weight": 1
+      "aliases": ["nether_brick_wall"], "weight": 0.3
     },
     {
       "name": "红色下界砖墙", "version": "1.16", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "红色下界砖砌的墙。",
-      "aliases": ["red_nether_brick_wall"], "weight": 1
+      "aliases": ["red_nether_brick_wall"], "weight": 0.3
     },
     {
       "name": "海晶石墙", "version": "1.8", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "海晶石砌的墙。",
-      "aliases": ["prismarine_wall"], "weight": 1
+      "aliases": ["prismarine_wall"], "weight": 0.3
     },
     {
       "name": "末地石砖墙", "version": "1.9", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "末地石砖砌的墙。",
-      "aliases": ["end_stone_brick_wall"], "weight": 1
+      "aliases": ["end_stone_brick_wall"], "weight": 0.3
     },
     {
       "name": "黑石墙", "version": "1.16", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "黑石砌的墙。",
-      "aliases": ["blackstone_wall"], "weight": 1
+      "aliases": ["blackstone_wall"], "weight": 0.3
     },
     {
       "name": "磨制黑石墙", "version": "1.16", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "磨制黑石砌的墙。",
-      "aliases": ["polished_blackstone_wall"], "weight": 1
+      "aliases": ["polished_blackstone_wall"], "weight": 0.3
     },
     {
       "name": "磨制黑石砖墙", "version": "1.16", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "磨制黑石砖砌的墙。",
-      "aliases": ["polished_blackstone_brick_wall"], "weight": 1
+      "aliases": ["polished_blackstone_brick_wall"], "weight": 0.3
     },
     {
       "name": "深板岩圆石墙", "version": "1.17", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "深板岩圆石砌的墙。",
-      "aliases": ["cobbled_deepslate_wall"], "weight": 1
+      "aliases": ["cobbled_deepslate_wall"], "weight": 0.3
     },
     {
       "name": "深板岩砖墙", "version": "1.17", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "深板岩砖砌的墙。",
-      "aliases": ["deepslate_brick_wall"], "weight": 1
+      "aliases": ["deepslate_brick_wall"], "weight": 0.3
     },
     {
       "name": "深板岩瓦墙", "version": "1.17", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "深板岩瓦砌的墙。",
-      "aliases": ["deepslate_tile_wall"], "weight": 1
+      "aliases": ["deepslate_tile_wall"], "weight": 0.3
     },
     {
       "name": "磨制深板岩墙", "version": "1.17", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "磨制深板岩砌的墙。",
-      "aliases": ["polished_deepslate_wall"], "weight": 1
+      "aliases": ["polished_deepslate_wall"], "weight": 0.3
     },
     {
       "name": "泥砖墙", "version": "1.19", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "泥砖砌的墙。",
-      "aliases": ["mud_brick_wall"], "weight": 1
+      "aliases": ["mud_brick_wall"], "weight": 0.3
     },
     {
       "name": "锻造模板", "version": "1.20", "type": "材料",
@@ -3076,13 +3096,13 @@
       "name": "竹马赛克台阶", "version": "1.20", "type": "方块",
       "tags": ["植物", "建筑"], "world": "无",
       "note": "竹马赛克做的台阶。",
-      "aliases": ["bamboo_mosaic_slab"], "weight": 1
+      "aliases": ["bamboo_mosaic_slab"], "weight": 0.3
     },
     {
       "name": "竹马赛克楼梯", "version": "1.20", "type": "方块",
       "tags": ["植物", "建筑"], "world": "无",
       "note": "竹马赛克做的楼梯。",
-      "aliases": ["bamboo_mosaic_stairs"], "weight": 1
+      "aliases": ["bamboo_mosaic_stairs"], "weight": 0.3
     },
     {
       "name": "泥巴", "version": "1.19", "type": "方块",
@@ -3100,13 +3120,13 @@
       "name": "泥砖台阶", "version": "1.19", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "泥砖做的台阶。",
-      "aliases": ["mud_brick_slab"], "weight": 1
+      "aliases": ["mud_brick_slab"], "weight": 0.3
     },
     {
       "name": "泥砖楼梯", "version": "1.19", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "泥砖做的楼梯。",
-      "aliases": ["mud_brick_stairs"], "weight": 1
+      "aliases": ["mud_brick_stairs"], "weight": 0.3
     },
     {
       "name": "蛙明灯", "version": "1.19", "type": "方块",
@@ -3592,409 +3612,409 @@
       "name": "石头楼梯", "version": "远古", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "石头做的楼梯。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "石头台阶", "version": "远古", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "石头做的半砖台阶。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "圆石楼梯", "version": "远古", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "圆石做的楼梯。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "圆石台阶", "version": "远古", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "圆石做的半砖台阶。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "石砖楼梯", "version": "远古", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "石砖做的楼梯。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "石砖台阶", "version": "远古", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "石砖做的半砖台阶。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "苔石楼梯", "version": "远古", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "苔石做的楼梯。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "苔石台阶", "version": "远古", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "苔石做的半砖台阶。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "苔石砖楼梯", "version": "1.8", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "苔石砖做的楼梯。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "苔石砖台阶", "version": "1.8", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "苔石砖做的半砖台阶。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "砂岩楼梯", "version": "远古", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "砂岩做的楼梯。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "砂岩台阶", "version": "远古", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "砂岩做的半砖台阶。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "红砂岩楼梯", "version": "远古", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "红砂岩做的楼梯。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "红砂岩台阶", "version": "远古", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "红砂岩做的半砖台阶。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "切制砂岩台阶", "version": "1.13", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "切制砂岩做的半砖台阶。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "切制红砂岩台阶", "version": "1.13", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "切制红砂岩做的半砖台阶。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "平滑砂岩楼梯", "version": "1.13", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "平滑砂岩做的楼梯。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "平滑砂岩台阶", "version": "1.13", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "平滑砂岩做的半砖台阶。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "平滑红砂岩楼梯", "version": "1.13", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "平滑红砂岩做的楼梯。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "平滑红砂岩台阶", "version": "1.13", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "平滑红砂岩做的半砖台阶。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "平滑石头台阶", "version": "1.14", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "平滑石头做的半砖台阶。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "红砖楼梯", "version": "远古", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "红砖做的楼梯。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "红砖台阶", "version": "远古", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "红砖做的半砖台阶。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "下界砖楼梯", "version": "远古", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "下界砖做的楼梯。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "下界砖台阶", "version": "远古", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "下界砖做的半砖台阶。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "红色下界砖楼梯", "version": "1.2", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "红色下界砖做的楼梯。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "红色下界砖台阶", "version": "1.2", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "红色下界砖做的半砖台阶。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "石英楼梯", "version": "1.5", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "石英做的楼梯。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "石英台阶", "version": "1.5", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "石英做的半砖台阶。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "平滑石英楼梯", "version": "1.5", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "平滑石英做的楼梯。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "平滑石英台阶", "version": "1.5", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "平滑石英做的半砖台阶。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "紫珀楼梯", "version": "1.9", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "紫珀做的楼梯。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "紫珀台阶", "version": "1.9", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "紫珀做的半砖台阶。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "海晶石楼梯", "version": "1.8", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "海晶石做的楼梯。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "海晶石台阶", "version": "1.8", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "海晶石做的半砖台阶。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "海晶石砖楼梯", "version": "1.8", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "海晶石砖做的楼梯。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "海晶石砖台阶", "version": "1.8", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "海晶石砖做的半砖台阶。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "暗海晶石楼梯", "version": "1.8", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "暗海晶石做的楼梯。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "暗海晶石台阶", "version": "1.8", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "暗海晶石做的半砖台阶。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "花岗岩楼梯", "version": "1.8", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "花岗岩做的楼梯。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "花岗岩台阶", "version": "1.8", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "花岗岩做的半砖台阶。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "磨制花岗岩楼梯", "version": "1.8", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "磨制花岗岩做的楼梯。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "磨制花岗岩台阶", "version": "1.8", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "磨制花岗岩做的半砖台阶。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "闪长岩楼梯", "version": "1.8", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "闪长岩做的楼梯。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "闪长岩台阶", "version": "1.8", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "闪长岩做的半砖台阶。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "磨制闪长岩楼梯", "version": "1.8", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "磨制闪长岩做的楼梯。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "磨制闪长岩台阶", "version": "1.8", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "磨制闪长岩做的半砖台阶。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "安山岩楼梯", "version": "1.8", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "安山岩做的楼梯。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "安山岩台阶", "version": "1.8", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "安山岩做的半砖台阶。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "磨制安山岩楼梯", "version": "1.8", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "磨制安山岩做的楼梯。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "磨制安山岩台阶", "version": "1.8", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "磨制安山岩做的半砖台阶。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "黑石楼梯", "version": "1.16", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "黑石做的楼梯。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "黑石台阶", "version": "1.16", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "黑石做的半砖台阶。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "磨制黑石楼梯", "version": "1.16", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "磨制黑石做的楼梯。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "磨制黑石台阶", "version": "1.16", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "磨制黑石做的半砖台阶。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "磨制黑石砖楼梯", "version": "1.16", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "磨制黑石砖做的楼梯。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "磨制黑石砖台阶", "version": "1.16", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "磨制黑石砖做的半砖台阶。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "深板岩圆石楼梯", "version": "1.17", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "深板岩圆石做的楼梯。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "深板岩圆石台阶", "version": "1.17", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "深板岩圆石做的半砖台阶。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "深板岩砖楼梯", "version": "1.17", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "深板岩砖做的楼梯。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "深板岩砖台阶", "version": "1.17", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "深板岩砖做的半砖台阶。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "深板岩瓦楼梯", "version": "1.17", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "深板岩瓦做的楼梯。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "深板岩瓦台阶", "version": "1.17", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "深板岩瓦做的半砖台阶。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "磨制深板岩楼梯", "version": "1.17", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "磨制深板岩做的楼梯。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "磨制深板岩台阶", "version": "1.17", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "磨制深板岩做的半砖台阶。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "末地石砖楼梯", "version": "1.9", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "末地石砖做的楼梯。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "末地石砖台阶", "version": "1.9", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "末地石砖做的半砖台阶。",
-      "aliases": [], "weight": 1
+      "aliases": [], "weight": 0.3
     },
     {
       "name": "石化橡木台阶", "version": "远古", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "老版本留下来的木头半砖。",
-      "aliases": ["petrified_oak_slab"], "weight": 1
+      "aliases": ["petrified_oak_slab"], "weight": 0.3
     },
     {
       "name": "绵羊", "version": "远古", "type": "生物",

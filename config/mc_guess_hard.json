@@ -1,6 +1,19 @@
 {
-  "_comment": "弗一把 · 困难模式新增题库（1.20.5 ~ 26.1），另外补了简单题库漏收的老物品（去皮原木 / 珊瑚 / 幽匿 / 唱片……）。与简单题库合并使用；同一个东西只收一条，变体写成 aliases；weight 是抽题权重（默认 1，越大越容易抽到）。",
-  "late_versions": ["1.20.5", "1.21", "1.21.2", "1.21.4", "1.21.5", "1.21.6", "1.21.9", "1.21.11", "26.1"],
+  "_comment": "弗一把 · 困难模式新增题库（1.20.5 ~ 26.3），另外补了简单题库漏收的老物品（去皮原木 / 珊瑚 / 幽匿 / 唱片……）。与简单题库合并使用；同一个东西只收一条，变体写成 aliases；weight 是抽题权重（默认 1，越大越容易抽到）。",
+  "late_versions": ["1.20.5", "1.21", "1.21.2", "1.21.4", "1.21.5", "1.21.6", "1.21.9", "1.21.11", "26.1", "26.2", "26.3"],
+  "version_names": {
+    "1.20.5": "犰甲狼兵",
+    "1.21": "棘巧试炼",
+    "1.21.2": "勇气之袋",
+    "1.21.4": "苍园觉醒",
+    "1.21.5": "春意盎然",
+    "1.21.6": "追逐天空",
+    "1.21.9": "铜器时代",
+    "1.21.11": "群骑纷争",
+    "26.1": "小鬼当家",
+    "26.2": "混沌立方",
+    "26.3": "奔赴荒野"
+  },
   "legacy_aliases": {
     "纹样陶片": ["涡流纹样陶片", "旋风纹样陶片", "刮削纹样陶片"],
     "锻造模板": ["镶铆锻造模板", "涡流锻造模板"],
@@ -37,13 +50,13 @@
       "name": "切制铜楼梯", "version": "1.17", "type": "方块",
       "tags": ["金属", "建筑"], "world": "无",
       "note": "切制铜块做的楼梯，放久了会一点点变绿。",
-      "aliases": ["cut_copper_stairs", "斑驳的切制铜楼梯", "锈蚀的切制铜楼梯", "氧化的切制铜楼梯", "涂蜡的切制铜楼梯", "涂蜡的斑驳切制铜楼梯", "涂蜡的锈蚀切制铜楼梯", "涂蜡的氧化切制铜楼梯"], "weight": 1
+      "aliases": ["cut_copper_stairs", "斑驳的切制铜楼梯", "锈蚀的切制铜楼梯", "氧化的切制铜楼梯", "涂蜡的切制铜楼梯", "涂蜡的斑驳切制铜楼梯", "涂蜡的锈蚀切制铜楼梯", "涂蜡的氧化切制铜楼梯"], "weight": 0.3
     },
     {
       "name": "切制铜台阶", "version": "1.17", "type": "方块",
       "tags": ["金属", "建筑"], "world": "无",
       "note": "切制铜块做的半砖，氧化和涂蜡的写法都算它。",
-      "aliases": ["cut_copper_slab", "斑驳的切制铜台阶", "锈蚀的切制铜台阶", "氧化的切制铜台阶", "涂蜡的切制铜台阶", "涂蜡的斑驳切制铜台阶", "涂蜡的锈蚀切制铜台阶", "涂蜡的氧化切制铜台阶"], "weight": 1
+      "aliases": ["cut_copper_slab", "斑驳的切制铜台阶", "锈蚀的切制铜台阶", "氧化的切制铜台阶", "涂蜡的切制铜台阶", "涂蜡的斑驳切制铜台阶", "涂蜡的锈蚀切制铜台阶", "涂蜡的氧化切制铜台阶"], "weight": 0.3
     },
     {
       "name": "雕纹铜块", "version": "1.21", "type": "方块",
@@ -55,13 +68,13 @@
       "name": "铜门", "version": "1.21", "type": "方块",
       "tags": ["金属", "建筑"], "world": "主世界",
       "note": "试炼密室里那种会自己氧化变绿的门。",
-      "aliases": ["copper_door", "斑驳的铜门", "锈蚀的铜门", "氧化的铜门", "涂蜡的铜门", "涂蜡的斑驳铜门", "涂蜡的锈蚀铜门", "涂蜡的氧化铜门"], "weight": 1
+      "aliases": ["copper_door", "斑驳的铜门", "锈蚀的铜门", "氧化的铜门", "涂蜡的铜门", "涂蜡的斑驳铜门", "涂蜡的锈蚀铜门", "涂蜡的氧化铜门"], "weight": 0.3
     },
     {
       "name": "铜活板门", "version": "1.21", "type": "方块",
       "tags": ["金属", "建筑"], "world": "主世界",
       "note": "铜做的活板门，越放越绿。",
-      "aliases": ["copper_trapdoor", "斑驳的铜活板门", "锈蚀的铜活板门", "氧化的铜活板门", "涂蜡的铜活板门", "涂蜡的斑驳铜活板门", "涂蜡的锈蚀铜活板门", "涂蜡的氧化铜活板门"], "weight": 1
+      "aliases": ["copper_trapdoor", "斑驳的铜活板门", "锈蚀的铜活板门", "氧化的铜活板门", "涂蜡的铜活板门", "涂蜡的斑驳铜活板门", "涂蜡的锈蚀铜活板门", "涂蜡的氧化铜活板门"], "weight": 0.3
     },
     {
       "name": "铜格栅", "version": "1.21", "type": "方块",
@@ -79,19 +92,19 @@
       "name": "凝灰岩楼梯", "version": "1.21", "type": "方块",
       "tags": ["石材", "建筑"], "world": "主世界",
       "note": "试炼密室里成片铺的灰楼梯。",
-      "aliases": ["tuff_stairs"], "weight": 1
+      "aliases": ["tuff_stairs"], "weight": 0.3
     },
     {
       "name": "凝灰岩台阶", "version": "1.21", "type": "方块",
       "tags": ["石材", "建筑"], "world": "主世界",
       "note": "凝灰岩切的半砖。",
-      "aliases": ["tuff_slab"], "weight": 1
+      "aliases": ["tuff_slab"], "weight": 0.3
     },
     {
       "name": "凝灰岩墙", "version": "1.21", "type": "方块",
       "tags": ["石材", "建筑"], "world": "主世界",
       "note": "试炼密室走廊两侧的矮墙。",
-      "aliases": ["tuff_wall"], "weight": 1
+      "aliases": ["tuff_wall"], "weight": 0.3
     },
     {
       "name": "雕纹凝灰岩", "version": "1.21", "type": "方块",
@@ -109,19 +122,19 @@
       "name": "磨制凝灰岩楼梯", "version": "1.21", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "磨制凝灰岩做的楼梯。",
-      "aliases": ["polished_tuff_stairs"], "weight": 1
+      "aliases": ["polished_tuff_stairs"], "weight": 0.3
     },
     {
       "name": "磨制凝灰岩台阶", "version": "1.21", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "磨制凝灰岩做的半砖。",
-      "aliases": ["polished_tuff_slab"], "weight": 1
+      "aliases": ["polished_tuff_slab"], "weight": 0.3
     },
     {
       "name": "磨制凝灰岩墙", "version": "1.21", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "磨制凝灰岩砌的墙。",
-      "aliases": ["polished_tuff_wall"], "weight": 1
+      "aliases": ["polished_tuff_wall"], "weight": 0.3
     },
     {
       "name": "凝灰岩砖", "version": "1.21", "type": "方块",
@@ -133,19 +146,19 @@
       "name": "凝灰岩砖楼梯", "version": "1.21", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "凝灰岩砖做的楼梯。",
-      "aliases": ["tuff_brick_stairs"], "weight": 1
+      "aliases": ["tuff_brick_stairs"], "weight": 0.3
     },
     {
       "name": "凝灰岩砖台阶", "version": "1.21", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "凝灰岩砖做的半砖。",
-      "aliases": ["tuff_brick_slab"], "weight": 1
+      "aliases": ["tuff_brick_slab"], "weight": 0.3
     },
     {
       "name": "凝灰岩砖墙", "version": "1.21", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "凝灰岩砖砌的墙。",
-      "aliases": ["tuff_brick_wall"], "weight": 1
+      "aliases": ["tuff_brick_wall"], "weight": 0.3
     },
     {
       "name": "雕纹凝灰岩砖", "version": "1.21", "type": "方块",
@@ -283,61 +296,61 @@
       "name": "苍白橡木楼梯", "version": "1.21.4", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "苍白橡木做的楼梯。",
-      "aliases": ["pale_oak_stairs"], "weight": 1
+      "aliases": ["pale_oak_stairs"], "weight": 0.3
     },
     {
       "name": "苍白橡木台阶", "version": "1.21.4", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "苍白橡木做的半砖。",
-      "aliases": ["pale_oak_slab"], "weight": 1
+      "aliases": ["pale_oak_slab"], "weight": 0.3
     },
     {
       "name": "苍白橡木栅栏", "version": "1.21.4", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "苍白橡木做的栅栏。",
-      "aliases": ["pale_oak_fence"], "weight": 1
+      "aliases": ["pale_oak_fence"], "weight": 0.3
     },
     {
       "name": "苍白橡木栅栏门", "version": "1.21.4", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "能开能关的苍白橡木栅栏。",
-      "aliases": ["pale_oak_fence_gate"], "weight": 1
+      "aliases": ["pale_oak_fence_gate"], "weight": 0.3
     },
     {
       "name": "苍白橡木门", "version": "1.21.4", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "苍白橡木做的门。",
-      "aliases": ["pale_oak_door"], "weight": 1
+      "aliases": ["pale_oak_door"], "weight": 0.3
     },
     {
       "name": "苍白橡木活板门", "version": "1.21.4", "type": "方块",
       "tags": ["木材", "建筑"], "world": "无",
       "note": "苍白橡木做的活板门。",
-      "aliases": ["pale_oak_trapdoor"], "weight": 1
+      "aliases": ["pale_oak_trapdoor"], "weight": 0.3
     },
     {
       "name": "苍白橡木按钮", "version": "1.21.4", "type": "方块",
       "tags": ["木材", "红石"], "world": "无",
       "note": "按一下发个短信号。",
-      "aliases": ["pale_oak_button"], "weight": 1
+      "aliases": ["pale_oak_button"], "weight": 0.3
     },
     {
       "name": "苍白橡木压力板", "version": "1.21.4", "type": "方块",
       "tags": ["木材", "红石"], "world": "无",
       "note": "踩上去就通电。",
-      "aliases": ["pale_oak_pressure_plate"], "weight": 1
+      "aliases": ["pale_oak_pressure_plate"], "weight": 0.3
     },
     {
       "name": "苍白橡木告示牌", "version": "1.21.4", "type": "方块",
       "tags": ["木材", "装饰"], "world": "无",
       "note": "写点东西挂墙上。",
-      "aliases": ["pale_oak_sign"], "weight": 1
+      "aliases": ["pale_oak_sign"], "weight": 0.3
     },
     {
       "name": "悬挂式苍白橡木告示牌", "version": "1.21.4", "type": "方块",
       "tags": ["木材", "装饰"], "world": "无",
       "note": "能挂在天花板上的告示牌。",
-      "aliases": ["pale_oak_hanging_sign"], "weight": 1
+      "aliases": ["pale_oak_hanging_sign"], "weight": 0.3
     },
     {
       "name": "苍白橡树树叶", "version": "1.21.4", "type": "方块",
@@ -403,19 +416,19 @@
       "name": "树脂砖台阶", "version": "1.21.4", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "树脂砖做的半砖。",
-      "aliases": ["resin_brick_slab"], "weight": 1
+      "aliases": ["resin_brick_slab"], "weight": 0.3
     },
     {
       "name": "树脂砖楼梯", "version": "1.21.4", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "树脂砖做的楼梯。",
-      "aliases": ["resin_brick_stairs"], "weight": 1
+      "aliases": ["resin_brick_stairs"], "weight": 0.3
     },
     {
       "name": "树脂砖墙", "version": "1.21.4", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "树脂砖砌的墙。",
-      "aliases": ["resin_brick_wall"], "weight": 1
+      "aliases": ["resin_brick_wall"], "weight": 0.3
     },
     {
       "name": "眼眸花", "version": "1.21.4", "type": "方块",
@@ -427,7 +440,7 @@
       "name": "苍白橡木船", "version": "1.21.4", "type": "工具",
       "tags": ["木材", "交通"], "world": "无",
       "note": "苍白橡木做的船，过河跑图都能用。",
-      "aliases": ["pale_oak_boat"], "weight": 1
+      "aliases": ["pale_oak_boat"], "weight": 0.3
     },
     {
       "name": "树脂砖", "version": "1.21.4", "type": "材料",
@@ -745,7 +758,7 @@
       "name": "音乐唱片", "version": "远古", "type": "特殊",
       "tags": ["装饰", "稀有"], "world": "无",
       "note": "十几张曲子都算它，放进唱片机就能听。",
-      "aliases": ["唱片", "music_disc"], "weight": 1
+      "aliases": ["唱片", "music_disc", "Bounce"], "weight": 1
     },
     {
       "name": "旗帜图案", "version": "1.14", "type": "材料",
@@ -937,55 +950,55 @@
       "name": "下界砖栅栏", "version": "1.16", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "下界砖砌的栅栏。",
-      "aliases": ["nether_brick_fence"], "weight": 1
+      "aliases": ["nether_brick_fence"], "weight": 0.3
     },
     {
       "name": "石英砖台阶", "version": "1.14", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "石英砖切的半砖。",
-      "aliases": ["quartz_brick_slab"], "weight": 1
+      "aliases": ["quartz_brick_slab"], "weight": 0.3
     },
     {
       "name": "石英砖楼梯", "version": "1.14", "type": "方块",
       "tags": ["石材", "建筑"], "world": "无",
       "note": "石英砖切的楼梯。",
-      "aliases": ["quartz_brick_stairs"], "weight": 1
+      "aliases": ["quartz_brick_stairs"], "weight": 0.3
     },
     {
       "name": "石按钮", "version": "1.13", "type": "方块",
       "tags": ["石材", "红石"], "world": "无",
       "note": "石头做的按钮。",
-      "aliases": ["stone_button"], "weight": 1
+      "aliases": ["stone_button"], "weight": 0.3
     },
     {
       "name": "石压力板", "version": "1.13", "type": "方块",
       "tags": ["石材", "红石"], "world": "无",
       "note": "石头做的压力板。",
-      "aliases": ["stone_pressure_plate"], "weight": 1
+      "aliases": ["stone_pressure_plate"], "weight": 0.3
     },
     {
       "name": "轻质测重压力板", "version": "1.15", "type": "方块",
       "tags": ["金属", "红石"], "world": "无",
       "note": "金做的，东西越多信号越强。",
-      "aliases": ["light_weighted_pressure_plate"], "weight": 1
+      "aliases": ["light_weighted_pressure_plate"], "weight": 0.3
     },
     {
       "name": "重质测重压力板", "version": "1.15", "type": "方块",
       "tags": ["金属", "红石"], "world": "无",
       "note": "铁做的，按数量分档。",
-      "aliases": ["heavy_weighted_pressure_plate"], "weight": 1
+      "aliases": ["heavy_weighted_pressure_plate"], "weight": 0.3
     },
     {
       "name": "磨制黑石按钮", "version": "1.16", "type": "方块",
       "tags": ["石材", "红石"], "world": "无",
       "note": "磨制黑石做的按钮。",
-      "aliases": ["polished_blackstone_button"], "weight": 1
+      "aliases": ["polished_blackstone_button"], "weight": 0.3
     },
     {
       "name": "磨制黑石压力板", "version": "1.16", "type": "方块",
       "tags": ["石材", "红石"], "world": "无",
       "note": "磨制黑石做的压力板。",
-      "aliases": ["polished_blackstone_pressure_plate"], "weight": 1
+      "aliases": ["polished_blackstone_pressure_plate"], "weight": 0.3
     },
     {
       "name": "去皮原木", "version": "1.13", "type": "方块",
@@ -1021,7 +1034,7 @@
       "name": "运输船", "version": "1.9", "type": "工具",
       "tags": ["木材", "交通"], "world": "无",
       "note": "带箱子的船，十一种都算它。",
-      "aliases": ["橡木运输船", "云杉木运输船", "白桦木运输船", "丛林运输船", "金合欢运输船", "深色橡木运输船", "红树运输船", "樱花运输船", "竹运输筏", "苍白橡木运输船", "boat_with_chest", "chest_boat"], "weight": 1
+      "aliases": ["橡木运输船", "云杉木运输船", "白桦木运输船", "丛林运输船", "金合欢运输船", "深色橡木运输船", "红树运输船", "樱花运输船", "竹运输筏", "苍白橡木运输船", "boat_with_chest", "chest_boat"], "weight": 0.3
     },
     {
       "name": "珊瑚", "version": "1.13", "type": "方块",
@@ -1171,13 +1184,13 @@
       "name": "铁门", "version": "远古", "type": "方块",
       "tags": ["金属", "建筑"], "world": "无",
       "note": "铁锭做的门，只能用按钮或拉杆开。",
-      "aliases": ["iron_door"], "weight": 1
+      "aliases": ["iron_door"], "weight": 0.3
     },
     {
       "name": "铁活板门", "version": "远古", "type": "方块",
       "tags": ["金属", "建筑"], "world": "无",
       "note": "铁做的活板门，手推不开。",
-      "aliases": ["iron_trapdoor"], "weight": 1
+      "aliases": ["iron_trapdoor"], "weight": 0.3
     },
     {
       "name": "海绵", "version": "远古", "type": "方块",
@@ -1214,6 +1227,138 @@
       "tags": ["植物", "装饰", "稀有"], "world": "无",
       "note": "蒲公英加八个金粒做的，给幼年动物用能冻住它的成长。",
       "aliases": ["golden_dandelion"], "weight": 1
+    },
+    {
+      "name": "硫黄", "version": "26.2", "type": "方块",
+      "tags": ["石材", "地形"], "world": "主世界",
+      "note": "硫黄洞穴里那种黄色石头，能切楼梯、台阶和墙。",
+      "aliases": ["硫黄楼梯", "硫黄台阶", "硫黄墙", "sulfur"], "weight": 1
+    },
+    {
+      "name": "磨制硫黄", "version": "26.2", "type": "方块",
+      "tags": ["石材", "建筑"], "world": "无",
+      "note": "磨平的硫黄，有楼梯、台阶和墙。",
+      "aliases": ["磨制硫黄楼梯", "磨制硫黄台阶", "磨制硫黄墙", "polished_sulfur"], "weight": 1
+    },
+    {
+      "name": "硫黄砖", "version": "26.2", "type": "方块",
+      "tags": ["石材", "建筑"], "world": "无",
+      "note": "硫黄切成的砖，有楼梯、台阶和墙。",
+      "aliases": ["硫黄砖楼梯", "硫黄砖台阶", "硫黄砖墙", "sulfur_bricks"], "weight": 1
+    },
+    {
+      "name": "雕纹硫黄", "version": "26.2", "type": "方块",
+      "tags": ["石材", "建筑"], "world": "无",
+      "note": "雕了花纹的硫黄。",
+      "aliases": ["chiseled_sulfur"], "weight": 1
+    },
+    {
+      "name": "烈性硫黄", "version": "26.2", "type": "方块",
+      "tags": ["石材", "稀有"], "world": "主世界",
+      "note": "九个硫黄合成的，泡在水里会冒泡，架在岩浆上就是间歇泉。",
+      "aliases": [], "weight": 1
+    },
+    {
+      "name": "朱砂", "version": "26.2", "type": "方块",
+      "tags": ["石材", "地形"], "world": "主世界",
+      "note": "硫黄洞穴里的红色石头，和硫黄一样能切各种变种。",
+      "aliases": ["朱砂楼梯", "朱砂台阶", "朱砂墙", "cinnabar"], "weight": 1
+    },
+    {
+      "name": "磨制朱砂", "version": "26.2", "type": "方块",
+      "tags": ["石材", "建筑"], "world": "无",
+      "note": "磨平的朱砂，有楼梯、台阶和墙。",
+      "aliases": ["磨制朱砂楼梯", "磨制朱砂台阶", "磨制朱砂墙", "polished_cinnabar"], "weight": 1
+    },
+    {
+      "name": "朱砂砖", "version": "26.2", "type": "方块",
+      "tags": ["石材", "建筑"], "world": "无",
+      "note": "朱砂切成的砖，有楼梯、台阶和墙。",
+      "aliases": ["朱砂砖楼梯", "朱砂砖台阶", "朱砂砖墙", "cinnabar_bricks"], "weight": 1
+    },
+    {
+      "name": "雕纹朱砂", "version": "26.2", "type": "方块",
+      "tags": ["石材", "建筑"], "world": "无",
+      "note": "雕了花纹的朱砂。",
+      "aliases": ["chiseled_cinnabar"], "weight": 1
+    },
+    {
+      "name": "硫方怪", "version": "26.2", "type": "生物",
+      "tags": ["被动"], "world": "主世界",
+      "note": "硫黄洞穴里的果冻怪，会吞方块；打死会裂成两只小的。",
+      "aliases": ["sulfur_cube"], "weight": 1
+    },
+    {
+      "name": "杨木原木", "version": "26.3", "type": "方块",
+      "tags": ["木材", "建筑"], "world": "主世界",
+      "note": "斑驳森林里杨树的树干，有去皮版本。",
+      "aliases": ["去皮杨木原木", "poplar_log"], "weight": 1
+    },
+    {
+      "name": "杨木", "version": "26.3", "type": "方块",
+      "tags": ["木材", "建筑"], "world": "主世界",
+      "note": "六面都是树皮的杨木，有去皮版本。",
+      "aliases": ["去皮杨木", "poplar_wood"], "weight": 1
+    },
+    {
+      "name": "杨木木板", "version": "26.3", "type": "方块",
+      "tags": ["木材", "建筑"], "world": "主世界",
+      "note": "杨木劈出来的木板，能做成整套木制品。",
+      "aliases": ["poplar_planks"], "weight": 1
+    },
+    {
+      "name": "杨树树叶", "version": "26.3", "type": "方块",
+      "tags": ["植物", "装饰"], "world": "主世界",
+      "note": "红、橙、黄三种颜色的杨树叶。",
+      "aliases": ["红色杨树树叶", "橙色杨树树叶", "黄色杨树树叶", "poplar_leaves"], "weight": 1
+    },
+    {
+      "name": "杨树树苗", "version": "26.3", "type": "方块",
+      "tags": ["植物", "装饰"], "world": "主世界",
+      "note": "种下去能长杨树，流浪商人也有卖。",
+      "aliases": ["poplar_sapling"], "weight": 1
+    },
+    {
+      "name": "层孔菇", "version": "26.3", "type": "方块",
+      "tags": ["植物", "食物"], "world": "主世界",
+      "note": "长在杨树干上的蘑菇，踩上去有弹性，也能煮蘑菇煲。",
+      "aliases": ["大型层孔菇"], "weight": 1
+    },
+    {
+      "name": "麦秆床", "version": "26.3", "type": "方块",
+      "tags": ["植物", "装饰"], "world": "无",
+      "note": "三个干草捆做四张，睡一晚就碎，也不设重生点。",
+      "aliases": ["straw_bed"], "weight": 1
+    },
+    {
+      "name": "坐垫", "version": "26.3", "type": "特殊",
+      "tags": ["装饰", "可染色"], "world": "主世界",
+      "note": "放地上就能坐的软垫子，16 种颜色都有。",
+      "aliases": ["cushion"], "colored": true, "weight": 1
+    },
+    {
+      "name": "羊毛楼梯", "version": "26.3", "type": "方块",
+      "tags": ["生物", "建筑", "可染色"], "world": "无",
+      "note": "羊毛做的楼梯，16 色都有。",
+      "aliases": [], "colored": true, "weight": 0.3
+    },
+    {
+      "name": "羊毛台阶", "version": "26.3", "type": "方块",
+      "tags": ["生物", "建筑", "可染色"], "world": "无",
+      "note": "羊毛做的半砖，16 色都有。",
+      "aliases": [], "colored": true, "weight": 0.3
+    },
+    {
+      "name": "混凝土楼梯", "version": "26.3", "type": "方块",
+      "tags": ["石材", "建筑", "可染色"], "world": "无",
+      "note": "混凝土做的楼梯，16 色都有。",
+      "aliases": [], "colored": true, "weight": 0.3
+    },
+    {
+      "name": "混凝土台阶", "version": "26.3", "type": "方块",
+      "tags": ["石材", "建筑", "可染色"], "world": "无",
+      "note": "混凝土做的半砖，16 色都有。",
+      "aliases": [], "colored": true, "weight": 0.3
     }
   ]
 }

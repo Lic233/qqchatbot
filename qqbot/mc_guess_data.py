@@ -7,6 +7,7 @@ JSON 结构：
 
     {
       "version_order": ["远古", "1.0", ...],     # 加入版本档位，顺序即新旧
+      "version_names": {"1.13": "水域更新", ...}, # 版本号 → 更新主题名（只用于显示）
       "types":  [...], "tags": [...],           # 类型 / 标签词表（写错会被自检抓出来）
       "worlds": [...], "colors": [...],         # 生成世界 / 16 种染料色
       "type_families": {"工具": "装备", ...},   # 哪些类型算「沾边」
@@ -147,6 +148,19 @@ _BANK_PATH = config_file(BANK_FILE)
 _PAYLOAD = read_bank(_BANK_PATH)
 
 VERSION_ORDER = _text_list(_PAYLOAD, "version_order", _BANK_PATH)
+
+# 版本号 → 更新主题名（1.13 → 水域更新），只用于显示，不参与新旧比较
+_NAMES_RAW = _PAYLOAD.get("version_names") or {}
+if not isinstance(_NAMES_RAW, dict) or not all(
+        isinstance(k, str) and isinstance(v, str) and v.strip()
+        for k, v in _NAMES_RAW.items()):
+    raise RuntimeError(f"题库 {_BANK_PATH} 的 version_names 必须是「版本号: 名字」对象")
+_unknown_names = [k for k in _NAMES_RAW if k not in VERSION_ORDER]
+if _unknown_names:
+    raise RuntimeError(
+        f"题库 {_BANK_PATH} 的 version_names 里有档位表没有的版本："
+        f"{'、'.join(_unknown_names)}")
+VERSION_NAMES: dict[str, str] = dict(_NAMES_RAW)
 TYPES = _text_list(_PAYLOAD, "types", _BANK_PATH)
 TAGS = _text_list(_PAYLOAD, "tags", _BANK_PATH)
 WORLDS = _text_list(_PAYLOAD, "worlds", _BANK_PATH)
@@ -167,6 +181,13 @@ for _entry in ITEMS:
 def find_item(text: str) -> Item | None:
     """按名字或别名找物品；找不到返回 None。"""
     return BY_NAME.get(normalize_name(text))
+
+
+def version_label(version: str, names=None) -> str:
+    """版本号的显示写法：「1.13」→「1.13 水域更新」；没有名字就原样返回。"""
+    table = VERSION_NAMES if names is None else names
+    name = table.get(version)
+    return f"{version} {name}" if name else version
 
 
 def version_newer(left: str, right: str, order=None) -> int:

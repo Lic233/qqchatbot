@@ -1,13 +1,15 @@
-"""「弗一把 · Minecraft 物品」困难模式题库：1.20.2 之后、26.1 及以前。
+"""「弗一把 · Minecraft 物品」困难模式题库：1.20.2 之后、26.3 及以前。
 
 简单模式用的是 ``config/mc_guess_easy.json``（Java 1.20.2 截止），这里**不动它**，
-只把 1.20.5 ~ 26.1 的新内容放在 ``config/mc_guess_hard.json`` 里，两边合并使用。
-26.1（小鬼当家）只多了一件金蒲公英，其余是幼年生物模型和音效。
+只把 1.20.5 ~ 26.3 的新内容放在 ``config/mc_guess_hard.json`` 里，两边合并使用。
+26.1 小鬼当家只多了一件金蒲公英；26.2 混沌立方加了硫黄洞穴、硫方怪；
+26.3 奔赴荒野加了杨树、层孔菇、红灌木、麦秆床和坐垫。
 
 JSON 结构与 ``mc_guess_easy.json`` 一样（items 数组），另外多两块：
 
     {
-      "late_versions": ["1.20.5", ..., "1.21.11", "26.1"],
+      "late_versions": ["1.20.5", ..., "1.21.11", "26.1", "26.2", "26.3"],
+      "version_names": {"1.21": "棘巧试炼", "26.1": "小鬼当家", ...},
       "items": [ ... ],
       "legacy_aliases": {"猪": ["温带猪", "寒带猪", "热带猪"], ...}
     }
@@ -26,12 +28,14 @@ from .config import config_file
 from .mc_guess_data import (
     COLORS,
     ITEMS,
+    VERSION_NAMES,
     VERSION_ORDER,
     Item,
     check_data,
     load_items,
     normalize_name,
     read_bank,
+    version_label as _version_label,
     version_newer as _version_newer,
 )
 
@@ -44,9 +48,28 @@ _LATE = _PAYLOAD.get("late_versions")
 if not isinstance(_LATE, list) or not all(isinstance(v, str) for v in _LATE):
     raise RuntimeError(f"题库 {_BANK_PATH} 的 late_versions 必须是字符串数组")
 
-# 1.20.2 之后的正式版档位（到 26.1 为止的所有内容更新）
+# 1.20.2 之后的正式版档位（到 26.3 为止的所有内容更新）
 LATE_VERSIONS = tuple(_LATE)
 VERSION_ORDER_HARD = VERSION_ORDER + LATE_VERSIONS
+
+_NAMES_RAW = _PAYLOAD.get("version_names") or {}
+if not isinstance(_NAMES_RAW, dict) or not all(
+        isinstance(k, str) and isinstance(v, str) and v.strip()
+        for k, v in _NAMES_RAW.items()):
+    raise RuntimeError(f"题库 {_BANK_PATH} 的 version_names 必须是「版本号: 名字」对象")
+_unknown_names = [k for k in _NAMES_RAW if k not in VERSION_ORDER_HARD]
+if _unknown_names:
+    raise RuntimeError(
+        f"题库 {_BANK_PATH} 的 version_names 里有档位表没有的版本："
+        f"{'、'.join(_unknown_names)}")
+_conflict = [k for k, v in _NAMES_RAW.items()
+             if k in VERSION_NAMES and VERSION_NAMES[k] != v]
+if _conflict:
+    raise RuntimeError(
+        f"题库 {_BANK_PATH} 的 version_names 和简单题库打架：{'、'.join(_conflict)}")
+
+# 两套题库的名字合并：简单模式的 1.x + 困难模式的 26.x
+VERSION_NAMES_HARD = {**VERSION_NAMES, **_NAMES_RAW}
 
 EXTRA_ITEMS = load_items(_BANK_PATH, COLORS, _PAYLOAD)
 HARD_ITEMS = ITEMS + EXTRA_ITEMS
@@ -67,6 +90,11 @@ for _owner, _aliases in _LEGACY_RAW.items():
 def version_newer(left: str, right: str) -> int:
     """困难模式的两版比对：用扩展后的档位表（老版本顺序不变）。"""
     return _version_newer(left, right, VERSION_ORDER_HARD)
+
+
+def version_label(version: str) -> str:
+    """带更新主题名的版本写法（两套题库的名字合并表）。"""
+    return _version_label(version, VERSION_NAMES_HARD)
 
 
 HARD_BY_NAME: dict[str, Item] = {}
