@@ -411,7 +411,7 @@ class Pets:
     def adjust(self, user_id: str, *, stamina: int = 0, mood: int = 0,
                affection: int = 0, exp: int = 0,
                now: float | None = None) -> dict:
-        """给外部玩法（宠物冒险 / 弗一把等）用的加减口：先结算，再改，最后落盘。
+        """给外部玩法用的加减口（宠物冒险 / 弗一把已经不发经验了）：先结算，再改，最后落盘。
 
         只负责「加/减 + 夹到上限 + 升级」，**不判断能不能干** —— 够不够体力、
         心情满没满，调用方自己看 ``snapshot`` 决定。这样它就不用知道冒险的规则，

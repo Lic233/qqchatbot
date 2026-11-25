@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import math
+import random
 
 from .ai import *  # noqa: F401,F403
 from .api import *  # noqa: F401,F403
@@ -43,17 +44,26 @@ from .pet_sword import *  # noqa: F401,F403
 from .mc_guess import (
     MAX_ROUNDS,
     MCGuess,
+    weighted_pick,
     NUDGE_IDLE,
-    REWARD_BASE,
-    REWARD_PER_SPARE_ROUND,
     SESSION_TTL,
 )
 from .mc_guess_data import (
+    BANK_FILE as MC_BANK_FILE,
+    COLORS as MC_COLORS,
     ITEMS as MC_ITEMS,
+    Item as MC_Item,
     VERSION_ORDER,
     check_data,
     find_item,
+    load_items as mc_load_items,
     version_newer,
+)
+from .mc_guess_data_hard import (
+    HARD_ITEMS as MC_HARD_ITEMS,
+    VERSION_ORDER_HARD,
+    check_hard_data,
+    find_hard_item,
 )
 from .panel import *  # noqa: F401,F403
 from .pet import *  # noqa: F401,F403
@@ -134,19 +144,8 @@ async def selftest() -> int:
     handler = Handler(sender, paths, persona_path=persona_file)
     failures: list[str] = []
 
-    # AI 短回复默认会自带一条语音条。自检不联网，也不该真去开 edge/PowerShell，
-    # 所以全局把合成换成假的（「== 语音 ==」那节自己会临时换成另一个假的）。
-    from . import handler as handler_module
-
-    ai_voices: list[str] = []
-
-    async def fake_synthesize(text, **kwargs):
-        ai_voices.append(text)
-        out = temporary / "stub-voice.wav"
-        out.write_bytes(b"RIFF" + b"\x00" * 1024)
-        return out
-
-    handler_module.synthesize = fake_synthesize
+    # 语音条只在群友发「语音：…」时触发，AI 回复不再自动念，所以这里不用打桩；
+    # 「== 语音 ==」那节会自己临时把合成换成假的（自检不联网）。
 
     async def feed(content: str, images: list[ImageRef] | None = None,
                    is_bot: bool = False, msg_id: str = "m1",
@@ -259,11 +258,10 @@ async def selftest() -> int:
     handler.chat = fake_chat
     sender.events.clear()
     ai_calls.clear()
-    ai_voices.clear()
     await feed("你好呀", mentioned=True)
-    expect("@ 触发 AI", sender.events == [("text", "收到：你好呀"),
-                                        ("voice", "stub-voice.wav")])
-    expect("短回复才念、念的是回复原文", ai_voices == ["收到：你好呀"])
+    expect("@ 触发 AI", sender.events == [("text", "收到：你好呀")])
+    expect("AI 回复只发文字、不自带语音条",
+           all(kind == "text" for kind, _ in sender.events))
     expect("提示词带人设", bool(ai_calls) and "测试人设" in ai_calls[0][0])
     expect("提示词带说话人", bool(ai_calls) and "「测试」" in ai_calls[0][0])
     expect("没开搜索时提示词说没联网", bool(ai_calls) and "没有联网工具" in ai_calls[0][0])
@@ -302,12 +300,10 @@ async def selftest() -> int:
         return "第一段。" * 400
 
     handler.chat = long_chat
-    ai_voices.clear()
     await feed("讲个长故事", mentioned=True, msg_id="m6")
     expect("长回复切成多条", len(sender.events) > 1)
     expect("每条都没超限", all(len(text) <= REPLY_CHUNK_CHARS for _, text in sender.events))
-    expect("长回复不念语音",
-           all(kind == "text" for kind, _ in sender.events) and not ai_voices)
+    expect("长回复也不念语音", all(kind == "text" for kind, _ in sender.events))
 
     # AI 失败要兜底，不能把异常抛出去
     sender.events.clear()
@@ -3004,6 +3000,138 @@ async def selftest() -> int:
            and find_item("淡蓝色陶瓦").name == "陶瓦")
     expect("乱七八糟的输入查不到", find_item("这个物品不存在喵") is None)
 
+    # ---- 困难模式题库（到 26.1 为止）----
+    expect("困难题库自检全过", check_hard_data() == [])
+    expect("题库扩到 800 件以上", len(MC_HARD_ITEMS) >= 800)
+    expect("困难题库把简单题库整个包进去",
+           all(any(a is b for b in MC_HARD_ITEMS) for a in MC_ITEMS))
+    expect("1.21 的新东西都在困难题库里",
+           all(find_hard_item(name) is not None for name in
+               ("重锤", "风弹", "铜灯", "试炼钥匙", "犰狳", "沼骸")))
+    expect("1.20.5 到 26.1 每个版本都有新内容",
+           all(any(item.version == version for item in MC_HARD_ITEMS)
+               for version in ("1.20.5", "1.21", "1.21.2", "1.21.4",
+                               "1.21.5", "1.21.6", "1.21.9", "1.21.11",
+                               "26.1")))
+    expect("困难档位接在简单档位后面",
+           VERSION_ORDER_HARD[:len(VERSION_ORDER)] == VERSION_ORDER
+           and len(VERSION_ORDER_HARD) > len(VERSION_ORDER))
+    expect("新版本比 1.20.2 新",
+           version_newer("1.21", "1.20.2", VERSION_ORDER_HARD) == 1
+           and version_newer("1.21.11", "1.21.4", VERSION_ORDER_HARD) == 1
+           and version_newer("1.20.5", "1.20.2", VERSION_ORDER_HARD) == 1)
+    expect("困难模式查得到新生物",
+           find_hard_item("焦骸").type == "生物"
+           and find_hard_item("小恶魂").name == "小恶魂"
+           and find_hard_item("嘎枝").world == "主世界")
+    expect("新物品的别名也认",
+           find_hard_item("parched").name == "焦骸"
+           and find_hard_item("红色收纳袋").name == "收纳袋"
+           and find_hard_item("钻石矛").name == "矛")
+    expect("同种类只留一条：七种矛合成「矛」",
+           find_hard_item("木矛").name == "矛"
+           and find_hard_item("下界合金矛").name == "矛"
+           and sum(1 for item in MC_HARD_ITEMS
+                   if item.name.endswith("矛")) == 1)
+    expect("动物变种并回同一只动物",
+           find_hard_item("寒带猪").name == "猪"
+           and find_hard_item("热带牛").name == "牛"
+           and find_hard_item("寒带鸡").name == "鸡"
+           and not any(item.name in ("寒带猪", "热带猪", "寒带牛",
+                                     "热带牛", "寒带鸡", "热带鸡")
+                       for item in MC_HARD_ITEMS))
+    expect("鸡蛋变种并回「蛋」",
+           find_hard_item("鸡蛋").name == "蛋"
+           and find_hard_item("蓝色鸡蛋").name == "蛋"
+           and find_hard_item("棕色鸡蛋").name == "蛋")
+    expect("每道题都有正数权值（现在全是 1）",
+           all(getattr(item, "weight", 0) == 1 for item in MC_ITEMS)
+           and all(getattr(item, "weight", 0) == 1 for item in MC_HARD_ITEMS))
+    mc_light = MC_Item("轻题", "远古", "方块", ("地形",), "无", note="x")
+    mc_heavy = MC_Item("重题", "远古", "方块", ("地形",), "无", note="x",
+                       weight=9)
+    weight_rng = random.Random(2026)
+    draws = [weighted_pick([mc_light, mc_heavy], weight_rng).name
+             for _ in range(2000)]
+    expect("权重大的题目更容易被抽到",
+           draws.count("重题") > draws.count("轻题") * 5)
+    mc_light2 = MC_Item("另一道轻题", "远古", "方块", ("地形",), "无", note="x")
+    even_draws = {weighted_pick([mc_light, mc_light2], weight_rng).name
+                  for _ in range(200)}
+    expect("权重一样时两道题都能抽到（均匀）",
+           even_draws == {"轻题", "另一道轻题"})
+
+    class _RngSpy:
+        def __init__(self):
+            self.calls = []
+
+        def choice(self, items):
+            self.calls.append("choice")
+            return items[0]
+
+        def choices(self, items, weights, k):
+            self.calls.append("choices")
+            return [items[0]]
+
+    spy = _RngSpy()
+    weighted_pick([mc_light, mc_light2], spy)
+    expect("权重全等也走加权抽（不再走 choice）", spy.calls == ["choices"])
+    try:
+        mc_load_items(Path("bad.json"), MC_COLORS, {"items": [{
+            "name": "测试物品", "version": "远古", "type": "方块",
+            "tags": ["地形"], "world": "无", "note": "x", "weight": 0}]})
+        bad_weight_ok = False
+    except RuntimeError as error:
+        bad_weight_ok = "weight" in str(error)
+    expect("权值写 0 或负数会当场报错", bad_weight_ok)
+    expect("一物一条：同名的物品不会出现两次",
+           len({item.name for item in MC_HARD_ITEMS}) == len(MC_HARD_ITEMS))
+    expect("切制铜楼梯 / 台阶也收进来了",
+           find_hard_item("切制铜楼梯").version == "1.17"
+           and find_hard_item("切制铜台阶").version == "1.17")
+    expect("涂蜡 / 氧化 / 斑驳的铜方块都认",
+           find_hard_item("涂蜡的切制铜台阶").name == "切制铜台阶"
+           and find_hard_item("斑驳的切制铜台阶").name == "切制铜台阶"
+           and find_hard_item("涂蜡的氧化切制铜台阶").name == "切制铜台阶"
+           and find_hard_item("斑驳的铜块").name == "铜块"
+           and find_hard_item("涂蜡的斑驳铜门").name == "铜门"
+           and find_hard_item("涂蜡的氧化铜箱子").name == "铜箱子")
+    expect("铜变种不单列条目",
+           not any(item.name.startswith(("涂蜡", "斑驳", "锈蚀", "氧化"))
+                   for item in MC_HARD_ITEMS))
+    expect("老物品的新写法挂在老条目上",
+           find_hard_item("温带猪").name == "猪"
+           and find_hard_item("涡流纹样陶片").name == "纹样陶片")
+    expect("简单题库没被新内容污染",
+           find_item("重锤") is None and find_item("焦骸") is None)
+    expect("题库是 JSON 文件，不是写死在代码里",
+           MC_BANK_FILE.endswith(".json")
+           and config_file(MC_BANK_FILE).exists()
+           and config_file("mc_guess_hard.json").exists())
+    try:
+        mc_load_items(Path("bad.json"), MC_COLORS, {"items": [{
+            "name": "测试物品", "version": "远古", "type": "方块",
+            "tags": ["地形"], "world": "无", "note": "x", "tagsx": 1}]})
+        bad_json_ok = False
+    except RuntimeError as error:
+        bad_json_ok = "认不出的字段" in str(error)
+    expect("JSON 写错字段名会当场报错", bad_json_ok)
+    expect("之前漏收的老东西也补进来了",
+           all(find_hard_item(name) is not None for name in
+               ("去皮原木", "珊瑚", "幽匿感测体", "木棍", "TNT", "海绵",
+                "唱片机", "树苗", "小麦", "运输船")))
+    expect("按需求去掉的条目确实不在",
+           all(find_hard_item(name) is None for name in
+               ("珊瑚扇", "管珊瑚扇", "鱼桶", "鳕鱼桶", "靶标",
+                "绯红菌索", "诡异菌索", "缠怨藤", "垂泪藤"))
+           and find_hard_item("珊瑚") is not None)
+    expect("补漏的系列按一个名字收",
+           find_hard_item("去皮樱花原木").name == "去皮原木"
+           and find_hard_item("管珊瑚").name == "珊瑚"
+           and find_hard_item("橡树树苗").name == "树苗"
+           and find_hard_item("小麦种子").name == "种子"
+           and find_hard_item("红色蘑菇").name == "蘑菇")
+
     # ---- 六维比对 ----
     mc_target = find_item("下界合金剑")
     nails = MCGuess._cells(find_item("钻石剑"), mc_target)
@@ -3025,13 +3153,10 @@ async def selftest() -> int:
     expect("答案更早的版本亮 ⬇️",
            MCGuess._cells(find_item("下界合金剑"), find_item("铁剑"))[1]
            .startswith("⬇️"))
-    expect("奖励缩到每人 15~24，平均 20 左右",
-           REWARD_BASE + int(REWARD_PER_SPARE_ROUND * (MAX_ROUNDS - 1)) == 24
-           and REWARD_BASE == 15)
 
-    # ---- 对局：开局 / 猜错 / 去重 / 猜中发奖 ----
+    # ---- 对局：难度面板 / 猜错 / 去重 / 猜中结算 ----
     handler.mc_guess.clear()
-    handler.mc_guess._pick = lambda: find_item("下界合金剑")
+    handler.mc_guess._pick = lambda *args, **kwargs: find_item("下界合金剑")
 
     async def mc(content, user="MC1", name="曼波", group="G-MC"):
         sender.events.clear()
@@ -3043,15 +3168,39 @@ async def selftest() -> int:
         return sender.events
 
     def mc_text() -> str:
-        return sender.events[0][1] if sender.events else ""
+        return sender.events[-1][1] if sender.events else ""
+
+    async def mc_start(user="MC1", name="曼波", group="G-MC", mode="简单"):
+        """发「弗一把」→ 点难度按钮，两步走完才算开局。"""
+        await mc("弗一把", user=user, name=name, group=group)
+        await mc(f"弗一把 {mode}模式", user=user, name=name, group=group)
 
     await mc("弗一把")
-    expect("「弗一把」开出题目和规则",
-           "弗一把" in mc_text() and "生成世界" in mc_text()
-           and "20 轮" in mc_text())
-    expect("开局后这局是活的", handler.mc_guess.active("G-MC") is not None)
+    expect("「弗一把」先给难度面板",
+           "简单模式" in mc_text() and "困难模式" in mc_text()
+           and "26.1" in mc_text())
+    panel = sender.panels[-1] if sender.panels else []
+    labels = [button["render_data"]["label"]
+              for row in panel for button in row["buttons"]]
+    data = [button["action"]["data"] for row in panel for button in row["buttons"]]
+    expect("面板就两个按钮：简单 / 困难",
+           labels == ["简单模式", "困难模式"] and data == ["弗一把 简单模式",
+                                                          "弗一把 困难模式"])
+    expect("面板按钮只签给唤出面板的人",
+           panel and panel[0]["buttons"][0]["action"]["permission"]["type"] == 0)
+    expect("选难度之前不开局", handler.mc_guess.active("G-MC") is None)
+
+    await mc("弗一把 简单模式")
+    expect("点了简单模式才开局",
+           "简单模式" in mc_text() and "20 轮" in mc_text()
+           and handler.mc_guess.active("G-MC") is not None)
+    expect("开局后这局是活的",
+           handler.mc_guess.active("G-MC") is not None
+           and handler.mc_guess.active("G-MC").mode == "简单")
     await mc("弗一把")
     expect("没打完再开会被拦下", "还没打完" in mc_text())
+    await mc("弗一把 困难模式")
+    expect("没打完不能换难度", "已经开着" in mc_text())
 
     await mc("弗一把 状态")
     expect("状态报出第 0/20 轮", "第 0/20 轮" in mc_text())
@@ -3078,31 +3227,19 @@ async def selftest() -> int:
     await mc("今天天气不错", user="MC3", name="群友")
     expect("局内普通闲聊不会被当成猜词", sender.events == [])
 
-    def mc_total_exp(user) -> int:
-        """宠物经验是「当前等级内的进度」，换成总量才好跟奖励对账。"""
-        record = handler.pets._users.get(user) or {}
-        level = int(record.get("level") or 1)
-        return (int(record.get("exp") or 0)
-                + sum(exp_need(stage) for stage in range(1, level)))
-
-    exp_before = {user: mc_total_exp(user) for user in ("MC2", "MC3")}
     await mc("下界合金剑", user="MC3", name="群友")
     win_text = mc_text()
     expect("猜中报答案和介绍",
            "猜中" in win_text and "下界合金剑" in win_text
            and "下界合金制的剑" in win_text)
-    expect("2 轮拿下，全员经验 = 15 + 18÷2", "全员宠物经验 +24" in win_text)
-    expect("参与过的人都拿到了经验（猜错的也算）",
-           all(mc_total_exp(user) - exp_before[user] == 24
-               for user in ("MC2", "MC3")))
-    expect("没参与的人不发经验",
-           int(handler.pets._users.get("MC4", {}).get("exp") or 0) == 0)
+    expect("猜中不再发宠物经验", "宠物经验" not in win_text and "经验 +" not in win_text)
+    expect("列出参与过的人",
+           "本局参与者" in win_text and "庞月" in win_text and "群友" in win_text)
     expect("猜中后局面关闭", handler.mc_guess.active("G-MC") is None)
 
     # ---- 二十轮用完：大肥鱼难过 ----
-    handler.mc_guess._pick = lambda: find_item("蜂蜜块")
-    exp_before_loss = int(handler.pets._users.get("MC9", {}).get("exp") or 0)
-    await mc("弗一把", user="MC9", name="阿曼")
+    handler.mc_guess._pick = lambda *args, **kwargs: find_item("蜂蜜块")
+    await mc_start(user="MC9", name="阿曼")
     wrong_guesses = (
         "铁剑", "木剑", "石剑", "金剑", "钻石剑", "弓", "弩", "盾牌",
         "剪刀", "鞍", "皮革", "苹果", "面包", "桶", "时钟", "地图",
@@ -3114,22 +3251,20 @@ async def selftest() -> int:
     expect("第二十轮猜错说大肥鱼难过",
            "这么简单都没猜到，大肥鱼很难过(；′⌒`)" in loss_text)
     expect("失败局揭晓答案", "蜂蜜块" in loss_text)
-    expect("失败不发经验",
-           int(handler.pets._users.get("MC9", {}).get("exp") or 0)
-           == exp_before_loss)
+    expect("失败不结算任何奖励", "宠物经验" not in loss_text)
     expect("失败后局面也关闭", handler.mc_guess.active("G-MC") is None)
 
     # ---- 认输 / 超时 ----
-    await mc("弗一把", user="MC6", name="阿曼")
+    await mc_start(user="MC6", name="阿曼")
     await mc("弗一把 结束", user="MC6", name="阿曼")
     expect("认输会揭晓答案",
            "答案是" in mc_text() and "蜂蜜块" in mc_text())
 
     fixed = [10_000.0]
     handler.mc_guess.now = lambda: fixed[0]
-    await mc("弗一把", user="MC7", name="阿曼")
+    await mc_start(user="MC7", name="阿曼")
     fixed[0] += SESSION_TTL + 1
-    await mc("弗一把", user="MC7", name="阿曼")
+    await mc_start(user="MC7", name="阿曼")
     expect("十分钟没动就散场、可以直接开新局",
            handler.mc_guess.active("G-MC").rounds == 0
            and "Minecraft 物品 & 生物篇" in mc_text())
@@ -3138,22 +3273,22 @@ async def selftest() -> int:
     handler.mc_guess.clear()
 
     # ---- 带颜色的题：只猜后缀也算中 ----
-    handler.mc_guess._pick = lambda: find_item("羊毛")
-    await mc("弗一把", user="MC11", name="阿曼")
+    handler.mc_guess._pick = lambda *args, **kwargs: find_item("羊毛")
+    await mc_start(user="MC11", name="阿曼")
     expect("开局不再白送类型提示", "类型是「" not in mc_text())
     await mc("猜 红色羊毛", user="MC11", name="阿曼")
     expect("带颜色的题猜「颜色+后缀」直接算中",
            "猜中" in mc_text() and "羊毛" in mc_text())
-    handler.mc_guess._pick = lambda: find_item("陶瓦")
-    await mc("弗一把", user="MC12", name="阿曼")
+    handler.mc_guess._pick = lambda *args, **kwargs: find_item("陶瓦")
+    await mc_start(user="MC12", name="阿曼")
     await mc("淡蓝色陶瓦", user="MC12", name="阿曼")
     expect("带颜色的题猜光秃秃的后缀也算中",
            "猜中" in mc_text() and "陶瓦" in mc_text())
 
     # ---- 榜单 / 趣味互动 ----
     handler.mc_guess.clear()
-    handler.mc_guess._pick = lambda: find_item("钻石剑")
-    await mc("弗一把", user="MC20", name="榜一大哥")
+    handler.mc_guess._pick = lambda *args, **kwargs: find_item("钻石剑")
+    await mc_start(user="MC20", name="榜一大哥")
     expect("开局界面直接带本群榜单", "本群榜" in mc_text())
     await mc("钻石剑", user="MC20", name="榜一大哥")
     expect("一轮秒杀会吐槽外挂", "这不是外挂？" in mc_text())
@@ -3164,8 +3299,8 @@ async def selftest() -> int:
     expect("「弗一把 榜单」能看完整榜",
            "本群弗一把榜" in mc_text() and "榜一大哥" in mc_text())
 
-    handler.mc_guess._pick = lambda: find_item("苹果")
-    await mc("弗一把", user="MC20", name="榜一大哥")
+    handler.mc_guess._pick = lambda *args, **kwargs: find_item("苹果")
+    await mc_start(user="MC20", name="榜一大哥")
     await mc("苹果", user="MC20", name="榜一大哥")
     expect("同一个人再中一次会累加", "第 2 次猜中" in mc_text())
 
@@ -3180,8 +3315,8 @@ async def selftest() -> int:
         early_ticker.cancel()
     fixed = [20_000.0]
     handler.mc_guess.now = lambda: fixed[0]
-    handler.mc_guess._pick = lambda: find_item("钻石剑")
-    await mc("弗一把", user="MC21", name="阿曼")
+    handler.mc_guess._pick = lambda *args, **kwargs: find_item("钻石剑")
+    await mc_start(user="MC21", name="阿曼")
     rounds_before = handler.mc_guess.active("G-MC").rounds
     fixed[0] += NUDGE_IDLE + 1
     first_nudge = handler.mc_guess.nudge("G-MC")
@@ -3203,25 +3338,66 @@ async def selftest() -> int:
     if ticker is not None:
         ticker.cancel()
 
-    # ---- 最后三轮给提示，但不直说 ----
+    # ---- 困难模式：从扩展题库里抽题 ----
     handler.mc_guess.clear()
-    handler.mc_guess._pick = lambda: find_item("钻石剑")
-    await mc("弗一把", user="MC30", name="阿曼", group="G-HINT")
+    handler.mc_guess._pick = lambda *args, **kwargs: find_hard_item("重锤")
+    await mc_start(user="MCH1", name="阿曼", group="G-HARD", mode="困难")
+    expect("困难模式开局写明范围和难度",
+           "困难模式" in mc_text() and "26.1" in mc_text())
+    expect("这一局记着是困难模式",
+           handler.mc_guess.active("G-HARD").mode == "困难")
+    await mc("猜 下界合金剑", user="MCH2", name="庞月", group="G-HARD")
+    expect("困难模式里老物品照样能猜（反馈走扩展档位）",
+           "题库里没有" not in mc_text()
+           and "还剩 19 次" in mc_text())
+    expect("新版本打 ⬆️ 而不是不认识",
+           "答案比「1.16」新" in mc_text())
+    await mc("重锤", user="MCH2", name="庞月", group="G-HARD")
+    expect("困难模式猜中新物品算中",
+           "猜中" in mc_text() and "重锤" in mc_text())
+    expect("困难局结束后不残留", handler.mc_guess.active("G-HARD") is None)
+
+    handler.mc_guess._pick = lambda *args, **kwargs: find_item("下界合金剑")
+    await mc_start(user="MCE1", name="阿曼", group="G-EASY")
+    await mc("猜 重锤", user="MCE1", name="阿曼", group="G-EASY")
+    expect("简单模式还是只认 1.20.2 的题库",
+           "题库里没有" in mc_text()
+           and handler.mc_guess.active("G-EASY").rounds == 0)
+    handler.mc_guess.clear()
+
+    # ---- 第 16 / 18 轮各给一个字 ----
+    handler.mc_guess.clear()
+    handler.mc_guess._pick = lambda *args, **kwargs: find_item("钻石剑")
+    await mc_start(user="MC30", name="阿曼", group="G-HINT")
     early = ("苹果", "面包", "桶", "时钟", "地图", "火把", "梯子", "箱子",
              "熔炉", "皮革", "箭", "铁剑", "木剑", "石剑", "金剑", "剪刀")
     for index, wrong in enumerate(early, 1):
         await mc(f"猜 {wrong}", user="MC30", name="阿曼", group="G-HINT")
+        if index == 15:
+            expect("前 15 轮不给提示", "小提示" not in mc_text())
         if index == 16:
-            expect("前 16 轮不给提示", "小提示" not in mc_text())
-    await mc("猜 鞍", user="MC30", name="阿曼", group="G-HINT")   # 第 17 轮，剩 3
-    expect("剩 3 轮给世界提示、不直说答案",
-           "小提示" in mc_text() and "不是自然长出来" in mc_text())
-    await mc("猜 弓", user="MC30", name="阿曼", group="G-HINT")   # 第 18 轮，剩 2
-    expect("剩 2 轮点出一个标签", "标签里有「宝石」" in mc_text())
-    await mc("猜 弩", user="MC30", name="阿曼", group="G-HINT")   # 第 19 轮，剩 1
-    expect("剩 1 轮点出名字第一个字", "第一个字是「钻」" in mc_text())
+            expect("第 16 轮给出名字第一个字",
+                   "第一个字是「钻」" in mc_text())
+    await mc("猜 鞍", user="MC30", name="阿曼", group="G-HINT")   # 第 17 轮
+    expect("第 17 轮不重复提示", "小提示" not in mc_text())
+    await mc("猜 弓", user="MC30", name="阿曼", group="G-HINT")   # 第 18 轮
+    expect("第 18 轮给出名字最后一个字",
+           "最后一个字是「剑」" in mc_text())
     expect("提示不额外烧轮数",
-           handler.mc_guess.active("G-HINT").rounds == 19)
+           handler.mc_guess.active("G-HINT").rounds == 18)
+
+    class _HintStub:
+        def __init__(self, rounds, target):
+            self.rounds, self.target = rounds, target
+
+    one_char = find_hard_item("矛")
+    expect("一个字的名字不把答案直接说穿",
+           "第一个字是「矛」" not in handler.mc_guess._hint(_HintStub(16, one_char))
+           and "最后一个字是「矛」" not in handler.mc_guess._hint(_HintStub(18, one_char))
+           and "答案就一个字" in handler.mc_guess._hint(_HintStub(16, one_char)))
+    expect("第 16 / 18 轮之外都不提示",
+           all(handler.mc_guess._hint(_HintStub(rounds, one_char)) == ""
+               for rounds in (0, 1, 15, 17, 19, 20)))
     handler.mc_guess.clear()
 
     await mc("猜 钻石剑", user="MC8", name="阿曼")
@@ -4202,8 +4378,9 @@ async def selftest() -> int:
     last = handler.swords.user("A1").get("last_run") or {}
     expect("打完第 8 个位面的首领 = 通关",
            last.get("outcome") == "clear" and last.get("scales", 0) >= 10)
-    expect("通关奖励是鲸鳞 + 宠物经验（不再是银币）",
-           last.get("exp", 0) > 0 and "coins" not in last)
+    expect("通关奖励只有鲸鳞（不再发宠物经验）",
+           last.get("scales", 0) >= 10 and "exp" not in last
+           and "coins" not in last)
     expect("通关后先问要不要存档",
            "通关 · 存档" in af_text() and "①存入" in af_labels())
     expect("存档面板过平台限制", af_panel_ok())
@@ -4311,12 +4488,11 @@ async def selftest() -> int:
     await af("宠物 冒险")
     await af(af_button("挥剑"))
     challenge = handler.swords.user("A1").get("last_challenge") or {}
-    expect("挑战成功给鲸鳞和宠物经验",
+    expect("挑战成功只给鲸鳞（不再发经验）",
            challenge.get("outcome") == "challenge_win"
            and challenge.get("scales") == CHALLENGE_SCALES
-           and challenge.get("exp", 0) >= CHALLENGE_EXP)
-    expect("挑战结算不再发银币", challenge.get("exp", 0) > 0
-           and "coins" not in challenge)
+           and "exp" not in challenge)
+    expect("挑战结算不发银币", "coins" not in challenge)
     expect("挑战胜场记进存档",
            int(handler.swords.user("A1")["saves"][0]["wins"]) == 1)
 
@@ -4348,10 +4524,10 @@ async def selftest() -> int:
     await af("宠物 冒险")
     await af(af_button("挥剑"))
     challenge = handler.swords.user("A1").get("last_challenge") or {}
-    expect("挑战失败：不发鲸鳞和经验、记负场",
+    expect("挑战失败：不发鲸鳞也不发经验、记负场",
            challenge.get("outcome") == "challenge_lose"
            and challenge.get("scales") == 0
-           and challenge.get("exp") == 0
+           and "exp" not in challenge
            and int(handler.swords.user("A1")["saves"][0]["losses"]) == 1)
 
     # 首领 3：攻击被弹开 + 自己回血
@@ -4392,7 +4568,7 @@ async def selftest() -> int:
                        "plane": 1, "floor": 1}]
     run["hp"] = 1
     run["options"] = [handler.swords._battle_node(run, KIND_NORMAL)]
-    expected_scales, expected_exp = handler.swords._run_reward(run, "dead")
+    expected_scales = handler.swords._run_reward(run, "dead")
     handler.swords._save()
     await af("宠物 冒险")
     await af(af_button("①战斗"))
@@ -4402,21 +4578,13 @@ async def selftest() -> int:
     handler.swords._save()
     await af(af_button("挥剑"))
     last = handler.swords.user("A1").get("last_run") or {}
-    expect("阵亡只带回一半鲸鳞和经验",
+    expect("阵亡只带回一半鲸鳞",
            last.get("outcome") == "dead"
            and last.get("scales") == expected_scales
-           and last.get("exp") == expected_exp)
+           and "exp" not in last)
     expect("阵亡结算里没有银币字段", "coins" not in last)
     expect("阵亡没有把进行中的一趟留在存档里",
            handler.swords._run("A1") is None)
-
-    # ---- 经验按回合数算 ----
-    expect("回合越少经验越多",
-           battle_exp(KIND_BOSS, 1) > battle_exp(KIND_BOSS, 5)
-           > battle_exp(KIND_BOSS, 9) > 0)
-    expect("首领的经验底子最高",
-           battle_exp(KIND_BOSS, 9) > battle_exp(KIND_ELITE, 9)
-           > battle_exp(KIND_NORMAL, 9))
 
     # ---- 鲸鳞兑换：启程资金 / 道具仓库 ----
     await af_home()

@@ -1,9 +1,12 @@
-"""弗一把 · Minecraft 物品版：全群一起猜一件物品，二十轮之内猜中全员拿宠物经验。
+"""弗一把 · Minecraft 物品版：全群一起猜一件物品，二十轮之内猜中全员上榜。
 
 玩法（跟 CSGO 的「弗一把」同一套路，只是把选手换成 Minecraft 物品）：
 
-* 群里有人发「弗一把」开局，我从 ``mc_guess_data.ITEMS``（Java 1.20.2 截止）
-  里抽一件物品当答案，开局先白送「类型」这个提示。
+* 群里有人发「弗一把」，先弹一块面板，按钮是**简单模式 / 困难模式**；
+  点了才抽题。两个模式规则完全一样，只有题库不同：
+  - **简单**：``mc_guess_data.ITEMS``（Java 1.20.2 截止），原样没动；
+  - **困难**：``mc_guess_data_hard``，26.1 及以前的全部物品与生物
+    （1.20.5 犰狳 → 1.21 试炼密室 → 1.21.11 鹦鹉螺 / 矛 → 26.1 金蒲公英都在）。
 * 之后谁都可以猜：直接发物品名 / 生物名，或者「猜 名字」。**全群共享二十轮**，
   每猜一次算一轮，猜错也会给六维反馈：
   名称重合 / 加入版本 / 类型 / 标签 / 字数 / 生成世界。
@@ -11,8 +14,8 @@
   ⬆️⬇️ 表示答案的版本更新 / 更旧。
 * **带颜色的物品只认后缀**：题库里羊毛 / 陶瓦 / 混凝土这些是一条家族条目，
   别名自动补齐 16 色，所以猜「羊毛」和猜「红色羊毛」都算猜中。
-* 二十轮内猜中：**所有参与猜过词的人**（猜错的也算）都拿宠物经验，
-  用的轮数越少经验越多；二十轮全用完还没中，就是大肥鱼难过那句话。
+* 二十轮内猜中：猜中的人记一次胜场、进本群榜（纯粹比谁猜得准）；
+  二十轮全用完还没中，就是大肥鱼难过那句话。
 * 一局十分钟没人动就散场（下次发「弗一把」直接开新局，不会卡着）。
 
 会话只在内存里（和 ``cs.py`` 一样，重启就没了），不落任何文件。
@@ -25,13 +28,19 @@ from .base import *  # noqa: F401,F403
 from .mc_guess_data import (
     ITEMS,
     TYPE_FAMILIES,
+    VERSION_ORDER,
     Item,
     check_data,
     find_item,
     normalize_name,
     version_newer,
 )
-from .pet import PET_NAME
+from .mc_guess_data_hard import (
+    HARD_ITEMS,
+    VERSION_ORDER_HARD,
+    check_hard_data,
+    find_hard_item,
+)
 
 # --------------------------------------------------------------------------
 # 常量
@@ -41,10 +50,26 @@ FILE_LOG = "[弗一把]"
 
 MAX_ROUNDS = 20                 # 一局总共能猜几次（全群共享）
 SESSION_TTL = 10 * 60.0         # 十分钟没人动就散场
-# 每人经验：15 + 剩余轮数 ÷ 2 → 第 1 轮猜中 24，第 20 轮猜中 15，平均 20 左右。
-# 宠物升级 1→2 级只要 25 点，所以一局差不多刚好顶一次小升级，不会太夸张。
-REWARD_BASE = 15
-REWARD_PER_SPARE_ROUND = 0.5
+
+# 两种难度：简单 = 原来的 1.20.2 题库；困难 = 26.1 及以前的全部物品与生物。
+MODE_EASY, MODE_HARD = "简单", "困难"
+MODE_LABELS = {MODE_EASY: "简单模式", MODE_HARD: "困难模式"}
+MODE_BANKS = {
+    MODE_EASY: {
+        "items": ITEMS,
+        "order": VERSION_ORDER,
+        "find": find_item,
+        "check": check_data,
+        "scope": "1.20.2 之前的物品和生物",
+    },
+    MODE_HARD: {
+        "items": HARD_ITEMS,
+        "order": VERSION_ORDER_HARD,
+        "find": find_hard_item,
+        "check": check_hard_data,
+        "scope": "26.1 及以前的全部物品和生物（1.21.x 和 26.1 的新内容都在里面）",
+    },
+}
 
 # 榜单：按「猜中次数」排，落盘 data/mc_guess_rank.json（按群分开算）
 RANK_FILE = "mc_guess_rank.json"
@@ -65,6 +90,11 @@ RANK_COMMANDS = ("弗一把榜单", "弗一把 榜单", "弗一把排行", "弗�
                  "弗一把排行榜", "弗一把 排行榜")
 END_COMMANDS = ("弗一把结束", "弗一把 结束", "认输", "弗一把认输",
                 "弗一把 认输", "不玩了", "放弃")
+# 面板按钮的 data：点一下就是把这句话发进来，和打字走同一条路
+MODE_DATA = {
+    MODE_EASY: "弗一把 简单模式",
+    MODE_HARD: "弗一把 困难模式",
+}
 # 长前缀放前面：「猜一下钻石」要先剥掉「猜一下」，不然会剩个「一下钻石」
 GUESS_PREFIXES = ("猜一下", "猜个", "我猜", "猜")
 
@@ -75,6 +105,13 @@ START_KEYS = frozenset(normalize_name(item) for item in START_COMMANDS)
 STATUS_KEYS = frozenset(normalize_name(item) for item in STATUS_COMMANDS)
 RANK_KEYS = frozenset(normalize_name(item) for item in RANK_COMMANDS)
 END_KEYS = frozenset(normalize_name(item) for item in END_COMMANDS)
+
+# 「弗一把 简单模式」/「弗一把困难」这些写法都认（面板按钮发的就是这句）
+MODE_KEYS: dict[str, str] = {}
+for _mode in (MODE_EASY, MODE_HARD):
+    for _text in (f"弗一把{_mode}", f"弗一把{_mode}模式",
+                  f"弗一把 {_mode}", f"弗一把 {_mode}模式"):
+        MODE_KEYS[normalize_name(_text)] = _mode
 
 # 颜色
 GREEN, YELLOW, RED = "🟩", "🟨", "⬜"
@@ -105,8 +142,9 @@ class Game:
     target: Item
     started_at: float
     last_at: float
+    mode: str = MODE_EASY
     guesses: list[Guess] = field(default_factory=list)
-    # user_id -> 昵称；参与过任意一次有效猜测的人都记着，结算时发经验
+    # user_id -> 昵称；参与过任意一次有效猜测的人都记着，结算时列出来
     players: dict[str, str] = field(default_factory=dict)
     # 猜过的物品名（归一化后）→ 防止同一件东西反复烧轮数
     tried: set[str] = field(default_factory=set)
@@ -135,6 +173,19 @@ class Game:
 # --------------------------------------------------------------------------
 
 
+def weighted_pick(items, rng):
+    """按每道题的 ``weight`` 抽一条：权重越大越容易被抽到。
+
+    **一律走加权抽**（``rng.choices``），权值全一样时自然就是均匀分布，
+    不再分「全等走 choice / 不等走 choices」两条路径。
+    权重必须是正数（加载时已经校验过）。
+    """
+    if not items:
+        raise ValueError("题库是空的，没法抽题")
+    weights = [float(getattr(item, "weight", 1.0)) for item in items]
+    return rng.choices(items, weights=weights, k=1)[0]
+
+
 class MCGuess:
     """「弗一把」的会话管理 + 规则实现。
 
@@ -143,6 +194,7 @@ class MCGuess:
     """
 
     def __init__(self, pets, data_dir=None, rng=None, now=None) -> None:
+        # pets 现在不参与结算（本玩法不再发宠物经验），参数留着不改调用方
         self.pets = pets
         self.rng = rng or random.Random()
         self.now = now or time.time
@@ -241,23 +293,25 @@ class MCGuess:
             return None
         if self.now() - game.last_at > SESSION_TTL:
             self._games.pop(str(group), None)
-            log(f"{FILE_LOG} 超时散场（{game.rounds}/{MAX_ROUNDS} 轮，"
-                f"答案 {game.target.name}）")
+            log(f"{FILE_LOG} 超时散场（{MODE_LABELS.get(game.mode, MODE_EASY)}，"
+                f"{game.rounds}/{MAX_ROUNDS} 轮，答案 {game.target.name}）")
             return None
         return game
 
     def clear(self) -> None:
         self._games.clear()
 
-    def _pick(self) -> Item:
-        return self.rng.choice(ITEMS)
+    def _pick(self, mode: str = MODE_EASY) -> Item:
+        items = MODE_BANKS.get(mode, MODE_BANKS[MODE_EASY])["items"]
+        return weighted_pick(items, self.rng)
 
     # ---- 对外入口 ----
 
     def handle(self, text: str, group: str, user: str, name: str = "") -> dict | None:
-        """认一条消息：开局 / 结束 / 状态 / 猜词。
+        """认一条消息：开局 / 选难度 / 结束 / 状态 / 猜词。
 
-        返回 ``{"reply": "..."}`` 表示这条消息归我处理；返回 ``None`` 表示
+        返回 ``{"panel": ...}`` 表示要发带按钮的面板（发「弗一把」时选难度），
+        ``{"reply": "..."}`` 表示这条消息归我处理；返回 ``None`` 表示
         不关我事（交给规则、AI 或复读），普通闲聊不会被抢。
         """
         text = (text or "").strip()
@@ -276,7 +330,17 @@ class MCGuess:
                     f"这把还没打完喵～ 现在第 {game.rounds + 1}/{MAX_ROUNDS} 轮，"
                     f"要重开先发「弗一把 结束」。\n{self._hint_line(game)}"
                 )}
-            return {"reply": self._start(group, name)}
+            return {"panel": self._mode_panel(group)}
+
+        if key in MODE_KEYS:
+            mode = MODE_KEYS[key]
+            if game is not None:
+                return {"reply": (
+                    f"这个群已经开着「{MODE_LABELS.get(game.mode, mode)}」了喵，"
+                    f"第 {game.rounds + 1}/{MAX_ROUNDS} 轮；"
+                    "要换难度先发「弗一把 结束」。"
+                )}
+            return {"reply": self._start(group, name, mode)}
 
         if key in STATUS_KEYS:
             if game is None:
@@ -293,32 +357,49 @@ class MCGuess:
             return {"reply": self._give_up_text(game)}
 
         if game is None:
-            item, _raw, prefixed = self._parse(text, key)
+            item, _raw, prefixed = self._parse(text, key, MODE_HARD)
             if prefixed and item is not None:
                 # 「猜 钻石剑」但还没开局：给一句提示；「猜猜我是谁」这种闲聊别接
-                return {"reply": "先发一句「弗一把」开局喵，不然猜了也不算数。"}
+                return {"reply": "先发一句「弗一把」选个难度开局喵，不然猜了也不算数。"}
             return None
 
         return self._guess(game, text, key, user, name)
 
     # ---- 开局 / 提示 ----
 
-    def _start(self, group: str, name: str) -> str:
-        target = self._pick()
+    def _mode_panel(self, group: str) -> dict:
+        """「弗一把」的第一屏：只给两个按钮，简单 / 困难，点了才开局。"""
+        lines = [
+            "# 🎮 弗一把 · Minecraft 物品 & 生物",
+            self._board_line(group),
+            "",
+            f"**{MODE_LABELS[MODE_EASY]}**：{MODE_BANKS[MODE_EASY]['scope']}，老题原样",
+            f"**{MODE_LABELS[MODE_HARD]}**：{MODE_BANKS[MODE_HARD]['scope']}",
+            "",
+            f"{MAX_ROUNDS} 轮全群共享 · 每猜一次给六维反馈 · 猜中记进本群榜",
+            "挑一个模式开局喵：",
+        ]
+        rows = [[(MODE_LABELS[MODE_EASY], MODE_DATA[MODE_EASY]),
+                 (MODE_LABELS[MODE_HARD], MODE_DATA[MODE_HARD])]]
+        return {"text": "\n".join(lines), "rows": rows}
+
+    def _start(self, group: str, name: str, mode: str = MODE_EASY) -> str:
+        bank = MODE_BANKS.get(mode, MODE_BANKS[MODE_EASY])
+        target = self._pick(mode)
         now = self.now()
-        game = Game(group=group, target=target, started_at=now, last_at=now)
+        game = Game(group=group, target=target, started_at=now, last_at=now,
+                    mode=mode)
         self._games[group] = game
-        log(f"{FILE_LOG} {name} 开局，答案：{target.name}"
+        log(f"{FILE_LOG} {name} 开局（{MODE_LABELS.get(mode, mode)}），"
+            f"答案：{target.name}"
             f"（{target.version} / {target.type} / {'、'.join(target.tags)}"
             f" / {target.world}）")
         return (
-            "🎮 弗一把 · Minecraft 物品 & 生物篇\n"
-            f"我从 1.20.2 之前的物品和生物里偷偷抽了一个，{MAX_ROUNDS} 轮内猜到，"
-            f"全群一起拿{PET_NAME}经验喵！\n"
-            f"直接发名字，或者「猜 名字」都行 —— 谁猜都算，{MAX_ROUNDS} 轮全群共享。\n"
-            "每猜一次我给六个维度的反馈：名称 / 加入版本 / 类型 / 标签 / 字数 / 生成世界\n"
+            f"🎮 弗一把 · Minecraft 物品 & 生物篇 · "
+            f"{MODE_LABELS.get(mode, MODE_EASY)}\n"
+            f"我从「{bank['scope']}」里偷偷抽了一个，{MAX_ROUNDS} 轮内猜到，"
+            f"全群一起猜，猜中记榜喵！\n"
             "🟩 完全对上 · 🟨 沾边 · ⬜ 不对 · ⬆️⬇️ 答案比它新 / 旧\n"
-            "带颜色的东西只猜后缀就行（猜「羊毛」= 红色羊毛 / 蓝色羊毛都算）。\n"
             f"{self._board_line(group)}\n"
             "想放弃就发「弗一把 结束」。"
         )
@@ -331,7 +412,8 @@ class MCGuess:
 
     def _status_text(self, game: Game) -> str:
         return (
-            f"🎮 弗一把 · 第 {game.rounds}/{MAX_ROUNDS} 轮"
+            f"🎮 弗一把 · {MODE_LABELS.get(game.mode, MODE_EASY)} · "
+            f"第 {game.rounds}/{MAX_ROUNDS} 轮"
             f"（还剩 {game.left} 次机会）\n"
             f"{self._hint_line(game)}\n"
             f"参与过的：{'、'.join(list(game.players.values())[:8]) or '还没有'}\n"
@@ -365,10 +447,12 @@ class MCGuess:
 
     # ---- 猜词 ----
 
-    def _parse(self, text: str, key: str) -> tuple[Item | None, str, bool]:
+    def _parse(self, text: str, key: str,
+               mode: str = MODE_EASY) -> tuple[Item | None, str, bool]:
         """从消息里剥出要猜的物品名：认「猜 X」前缀，也认光秃秃的物品名。
 
-        返回（物品, 剩下的原文, 是不是带了「猜」前缀）。
+        返回（物品, 剩下的原文, 是不是带了「猜」前缀）。困难模式的题库更大，
+        所以查表要用这局对应的那张。
         """
         raw, prefixed = text, False
         for prefix in GUESS_PREFIXES:
@@ -376,11 +460,12 @@ class MCGuess:
             if key.startswith(head) and len(key) > len(head):
                 raw, prefixed = text[len(prefix):].strip(), True
                 break
-        return find_item(raw), raw, prefixed
+        find = MODE_BANKS.get(mode, MODE_BANKS[MODE_EASY])["find"]
+        return find(raw), raw, prefixed
 
     def _guess(self, game: Game, text: str, key: str, user: str,
                name: str) -> dict | None:
-        item, raw, prefixed = self._parse(text, key)
+        item, raw, prefixed = self._parse(text, key, game.mode)
 
         if item is None:
             if not prefixed:
@@ -395,8 +480,9 @@ class MCGuess:
         game.last_at = self.now()
 
         win = item.name == game.target.name
+        order = MODE_BANKS.get(game.mode, MODE_BANKS[MODE_EASY])["order"]
         guess = Guess(user=user, name=name, item=item,
-                      cells=self._cells(item, game.target), win=win)
+                      cells=self._cells(item, game.target, order), win=win)
         game.guesses.append(guess)
 
         if win:
@@ -413,10 +499,10 @@ class MCGuess:
     # ---- 六维比对 ----
 
     @staticmethod
-    def _cells(guess: Item, target: Item) -> list[str]:
+    def _cells(guess: Item, target: Item, order=None) -> list[str]:
         return [
             MCGuess._name_cell(guess, target),
-            MCGuess._version_cell(guess, target),
+            MCGuess._version_cell(guess, target, order),
             MCGuess._type_cell(guess, target),
             MCGuess._tag_cell(guess, target),
             MCGuess._chars_cell(guess, target),
@@ -433,11 +519,11 @@ class MCGuess:
         return f"{YELLOW} 重合 {len(shared)} 字「{''.join(shared)}」"
 
     @staticmethod
-    def _version_cell(guess: Item, target: Item) -> str:
-        order = version_newer(guess.version, target.version)
-        if order == 0:
+    def _version_cell(guess: Item, target: Item, order=None) -> str:
+        newer = version_newer(guess.version, target.version, order)
+        if newer == 0:
             return f"{GREEN} {guess.version}"
-        if order < 0:
+        if newer < 0:
             return f"{UP} 答案比「{guess.version}」新"
         return f"{DOWN} 答案比「{guess.version}」旧"
 
@@ -478,25 +564,21 @@ class MCGuess:
     # ---- 文案 ----
 
     def _hint(self, game: Game) -> str:
-        """最后三轮的小提示：一步一步给，但都不直说答案。"""
-        left = game.left
+        """两次小提示：第 16 轮给名字第一个字，第 18 轮给最后一个字。
+
+        只按「已经猜了几轮」触发，不看剩几轮；夹在中间的第 17 / 19 / 20 轮
+        不提示。名字只有一个字时不点名（说了就等于公布答案），换成一句
+        「看看已猜里哪个最像它」。
+        """
+        rounds = game.rounds
         target = game.target
-        if left == 3:
-            talk = {
-                "主世界": "它平时就在主世界晃，出门抬头就可能撞见。",
-                "下界": "想见它得先穿过下界门。",
-                "末地": "它只在末地那一带出没。",
-                "无": "它不是自然长出来的，得自己动手做或召唤。",
-            }
-            return "🔍 小提示：" + talk.get(target.world, "它不太按常理出牌。")
-        if left == 2:
-            tag = target.tags[0] if target.tags else "稀有"
-            return f"🔍 小提示：它的标签里有「{tag}」。"
-        if left == 1:
-            if len(target.name) <= 1:
-                return "🔍 小提示：答案就一个字，看看已猜里哪个最像它。"
+        if rounds not in (16, 18):
+            return ""
+        if len(target.name) <= 1:
+            return "🔍 小提示：答案就一个字，看看已猜里哪个最像它。"
+        if rounds == 16:
             return f"🔍 小提示：名字的第一个字是「{target.name[0]}」。"
-        return ""
+        return f"🔍 小提示：名字的最后一个字是「{target.name[-1]}」。"
 
     def _round_text(self, game: Game, guess: Guess) -> str:
         text = (
@@ -509,22 +591,6 @@ class MCGuess:
             text += "\n" + hint
         return text
 
-    def _reward(self, game: Game) -> tuple[int, list[str]]:
-        """给所有参与者发宠物经验，返回（每人经验, 升级播报）。"""
-        exp = REWARD_BASE + int(REWARD_PER_SPARE_ROUND * game.left)
-        notes: list[str] = []
-        for user, name in game.players.items():
-            try:
-                result = self.pets.adjust(user, exp=exp)
-            except Exception as error:  # noqa: BLE001 - 发奖失败不能挡住结算
-                log(f"{FILE_LOG} 给 {user[:8]}… 发经验失败：{error!r}")
-                continue
-            levels = int(result.get("levels") or 0)
-            if levels:
-                level = int(result["record"].get("level") or 1)
-                notes.append(f"{name} 升到 Lv.{level}")
-        return exp, notes
-
     def _win_flavor(self, game: Game) -> str:
         """猜中时的趣味吐槽（纯文案，不影响任何结算）。"""
         if game.rounds == 1:
@@ -536,7 +602,6 @@ class MCGuess:
         return ""
 
     def _win_text(self, game: Game, guess: Guess) -> str:
-        exp, notes = self._reward(game)
         wins, rank = self.record_win(game.group, guess.user, guess.name)
         players = list(game.players.values())
         shown = "、".join(players[:8])
@@ -551,12 +616,10 @@ class MCGuess:
         lines += [
             f"第 {game.rounds}/{MAX_ROUNDS} 轮拿下（{guess.name} 猜中的）"
             f"{self._win_flavor(game)}",
-            f"🐟 全员宠物经验 +{exp}（{PET_NAME}）：{shown}",
+            f"🐟 本局参与者：{shown}",
             f"🏆 {guess.name} 第 {wins} 次猜中，本群第 {rank} 名",
         ]
-        if notes:
-            lines.append("升级：" + "、".join(notes))
-        log(f"{FILE_LOG} 猜中，{game.rounds} 轮，{len(players)} 人各 +{exp} 经验；"
+        log(f"{FILE_LOG} 猜中，{game.rounds} 轮，{len(players)} 人参与；"
             f"{guess.name} 累计 {wins} 次")
         return "\n".join(lines)
 
@@ -579,6 +642,7 @@ class MCGuess:
 
 # 题库本身的自检在 selftest 里也用得到
 __all__ = [
-    "Game", "Guess", "MAX_ROUNDS", "MCGuess", "SESSION_TTL",
-    "REWARD_BASE", "REWARD_PER_SPARE_ROUND", "check_data", "ITEMS",
+    "Game", "Guess", "MAX_ROUNDS", "MCGuess", "MODE_EASY", "MODE_HARD",
+    "MODE_LABELS", "SESSION_TTL",
+    "check_data", "ITEMS",
 ]

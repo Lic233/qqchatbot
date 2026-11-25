@@ -36,7 +36,6 @@ from .forge_new import PATTERN_MULTIPLIER, wear_grade
 from .pet_sword_data import (
     CHALLENGE_BOSSES,
     CHALLENGE_BY_KEY,
-    CHALLENGE_EXP,
     CHALLENGE_SCALES,
     COINS_TO_SCALES,
     EFFECT_ATK,
@@ -57,7 +56,6 @@ from .pet_sword_data import (
     EXCHANGE_SILVER_COSTS,
     EXCHANGE_SILVER_KEY,
     EXCHANGE_SILVER_NAME,
-    EXP_CLEAR_BONUS,
     FLOORS_PER_PLANE,
     ITEMS,
     KIND_BOSS,
@@ -76,7 +74,6 @@ from .pet_sword_data import (
     Item,
     Move,
     Option,
-    battle_exp,
     challenge_boss,
     exchange_silver_bonus,
     item_line,
@@ -88,7 +85,6 @@ from .pet_sword_data import (
     random_move,
     random_relic,
     stats_for,
-    turn_multiplier,
     upgrade_cost,
 )
 
@@ -814,9 +810,7 @@ class SwordAdventure:
             f"/{snapshot['mood_max']}"
         )
         lines.append(
-            f"战迹：出征 {int(record.get('runs') or 0)} 次 · "
-            f"累计宠物经验 {int(record.get('exp') or 0)} · "
-            f"单趟最多 {int(record.get('best') or 0)}"
+            f"战迹：出征 {int(record.get('runs') or 0)} 次"
         )
         vault = record.get("vault") or {}
         silver_level = int(vault.get("silver") or 0)
@@ -1555,7 +1549,7 @@ class SwordAdventure:
         if run.get("challenge"):
             return self._end_challenge(state, run, True)
         battle = run["battle"]
-        # 结算时按「每场战斗用了几个回合」算宠物经验：越利落越多
+        # 记一笔战斗，结算面板上要报「打了多少场」
         run.setdefault("battles", []).append({
             "kind": str(battle.get("kind") or KIND_NORMAL),
             "turns": int(battle.get("turn") or 1),
@@ -2321,54 +2315,38 @@ class SwordAdventure:
         self._end_run(state, run, "quit")
         return {"ok": True, "panel": self._panel(state), "reply": ""}
 
-    def _run_reward(self, run: dict, outcome: str) -> tuple[int, int]:
-        """这一趟带回来的 ``(鲸鳞, 宠物经验)``。
+    def _run_reward(self, run: dict, outcome: str) -> int:
+        """这一趟带回来的鲸鳞。
 
-        经验按**每场战斗的回合数**算：2 回合内 ×2、5 回合内 ×1.5、8 回合内 ×1.2，
-        再慢就只有原值；首领的底子最高。通关额外加一笔。阵亡只带回一半。
+        每通过一层 +1、每个首领 +3、通关 +10，再按局内银币折算；阵亡只带回一半。
         """
         scales = int(run.get("scales") or 0)
-        exp = 0
-        for battle in run.get("battles") or []:
-            exp += battle_exp(str(battle.get("kind") or KIND_NORMAL),
-                              int(battle.get("turns") or 1))
         if outcome == "clear":
             scales += SCALES_PER_CLEAR
-            exp += EXP_CLEAR_BONUS
         scales += int(int(run.get("coins") or 0) // COINS_TO_SCALES)
         if outcome == "dead":
             scales = int(scales * REWARD_DEATH_RATE)
-            exp = int(exp * REWARD_DEATH_RATE)
-        return scales, exp
+        return scales
 
     def _end_run(self, state: Panel, run: dict, outcome: str) -> None:
         record = self.user(state.user)
-        scales, exp = self._run_reward(run, outcome)
-        levels = 0
-        pet_level = int(self.pets.snapshot(state.user)["record"].get("level") or 1)
-        if exp:
-            info = self.pets.adjust(state.user, exp=int(exp))
-            levels = int(info.get("levels") or 0)
-            pet_level = int((info.get("record") or {}).get("level") or pet_level)
+        scales = self._run_reward(run, outcome)
         meta = record["meta"]
         meta["points"] = int(meta.get("points") or 0) + scales
         record["runs"] = int(record.get("runs") or 0) + 1
-        record["exp"] = int(record.get("exp") or 0) + exp
-        record["best"] = max(int(record.get("best") or 0), exp)
         # 通关时 plane 已经加到了 9（“下一层”不存在），结算面板上要显示成第 8 位面第 5 层
         plane = min(int(run.get("plane") or 1), MAX_PLANES)
         floor = (FLOORS_PER_PLANE if outcome == "clear"
                  else min(int(run.get("floor") or 1), FLOORS_PER_PLANE))
         summary = {
             "outcome": outcome,
-            "scales": scales, "exp": exp, "levels": levels,
+            "scales": scales,
             "plane": plane,
             "floor": floor,
             "floors": int(run.get("floors_done") or 0),
             "battles": len(run.get("battles") or []),
             "sword": str(run.get("sword_name") or "剑"),
             "sharp": int(run.get("sharp") or 0),
-            "pet_level": pet_level,
             "points": int(meta.get("points") or 0),
         }
         record["run"] = None
@@ -2376,7 +2354,7 @@ class SwordAdventure:
         state.end = summary
         self._save()
         log(f"{SWORD_LOG} {state.name} {outcome}：位面{run.get('plane')}"
-            f"第{run.get('floor')}层，+{scales} 鲸鳞 +{exp} 经验")
+            f"第{run.get('floor')}层，+{scales} 鲸鳞")
 
     def _end_panel(self, state: Panel, summary: dict) -> dict:
         outcome = summary.get("outcome") or "quit"
@@ -2387,19 +2365,16 @@ class SwordAdventure:
             f"## 宠物冒险 · {title}",
             f"走到 **位面{summary.get('plane')} · 第{summary.get('floor')}层**"
             f"（共通过 {summary.get('floors')} 层，打了 {summary.get('battles')} 场）",
-            f"鲸鳞 **+{summary.get('scales')}**（现有 {summary.get('points')}）· "
-            f"宠物经验 **+{summary.get('exp')}**"
-            f"（Lv.{summary.get('pet_level')}"
-            f"{'，升级了' if summary.get('levels') else ''}）",
+            f"鲸鳞 **+{summary.get('scales')}**（现有 {summary.get('points')}）",
         ]
         if outcome == "dead":
-            lines.append("这趟只捎回一半鲸鳞和经验 —— 命比钱要紧。")
+            lines.append("这趟只捎回一半鲸鳞 —— 命比钱要紧。")
         elif outcome == "clear":
             lines.append("八个位面全清了，深海记住了你的名字。")
         else:
             lines.append("见好就收，回去磨磨刀还能再来。")
-        lines.append("局内银币留在局里（商店、磨刀用），带回来的是鲸鳞和宠物经验；"
-                     "经验和每场战斗的回合数有关，回合越少给得越多。")
+        lines.append("局内银币留在局里（商店、磨刀用），带回来的是鲸鳞；"
+                     "每 150 局内银币还能再折 1 鲸鳞。")
         if summary.get("note"):
             lines.append(f"> {summary['note']}")
         if int(summary.get("sharp") or 0) <= 0:
@@ -2774,13 +2749,6 @@ class SwordAdventure:
             saved[key] = int(saved.get(key) or 0) + 1
         turns = int((run.get("battle") or {}).get("turn") or 1)
         scales = CHALLENGE_SCALES if win else 0
-        exp = (int(round(CHALLENGE_EXP * turn_multiplier(turns))) if win else 0)
-        levels = 0
-        pet_level = int(self.pets.snapshot(state.user)["record"].get("level") or 1)
-        if exp:
-            info = self.pets.adjust(state.user, exp=int(exp))
-            levels = int(info.get("levels") or 0)
-            pet_level = int((info.get("record") or {}).get("level") or pet_level)
         meta = record["meta"]
         meta["points"] = int(meta.get("points") or 0) + scales
         record["challenge_runs"] = int(record.get("challenge_runs") or 0) + 1
@@ -2789,8 +2757,8 @@ class SwordAdventure:
         record["run"] = None
         summary = {
             "outcome": "challenge_win" if win else "challenge_lose",
-            "scales": scales, "exp": exp, "levels": levels,
-            "turns": turns, "pet_level": pet_level,
+            "scales": scales,
+            "turns": turns,
             "slot": slot, "boss": boss.name if boss else "首领",
             "points": int(meta.get("points") or 0),
             "fled": bool(fled),
@@ -2813,12 +2781,8 @@ class SwordAdventure:
         ]
         if win:
             lines.append(f"鲸鳞 **+{summary.get('scales')}**（现有 "
-                         f"{summary.get('points')}）· 宠物经验 "
-                         f"**+{summary.get('exp')}**（Lv.{summary.get('pet_level')}"
-                         f"{'，升级了' if summary.get('levels') else ''}）")
-            lines.append(f"用了 {summary.get('turns')} 回合解决"
-                         f"（×{turn_multiplier(int(summary.get('turns') or 1)):g}），"
-                         "回合越少经验越多。")
+                         f"{summary.get('points')}）")
+            lines.append(f"用了 {summary.get('turns')} 回合解决。")
             lines.append("这份存档还留着，可以接着挑战。")
         else:
             lines.append("这一趟没打赢，存档还在，磨磨刀再来。")

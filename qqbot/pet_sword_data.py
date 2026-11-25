@@ -720,7 +720,6 @@ def random_event(rng=random) -> Event:
 
 SAVE_SLOTS = 3                 # 存档栏位
 CHALLENGE_SCALES = 12          # 挑战胜利的鲸鳞
-CHALLENGE_EXP = 80             # 挑战胜利的宠物经验（再乘回合倍率）
 
 
 @dataclass(frozen=True)
@@ -773,29 +772,11 @@ def challenge_boss(rng=random) -> ChallengeBoss:
 
 
 # --------------------------------------------------------------------------
-# 结算奖励：鲸鳞 + 宠物经验（银币只留在局内花）
+# 结算奖励：鲸鳞（银币只留在局内花）
 # --------------------------------------------------------------------------
 
-# 每场战斗的宠物经验底子；回合数越少，倍率越高（打法越利落给得越多）
-EXP_PER_BATTLE = {"战斗": 5, "精英": 12, "首领": 30}
-EXP_TURN_BANDS = ((2, 2.0), (5, 1.5), (8, 1.2))
-EXP_CLEAR_BONUS = 120          # 通关额外经验
 COINS_TO_SCALES = 150          # 每 150 局内银币折 1 鲸鳞（带出来的银币换成鲸鳞）
-REWARD_DEATH_RATE = 0.5        # 阵亡只带回一半鲸鳞和经验
-
-
-def turn_multiplier(turns: int) -> float:
-    """这场战斗的回合数 → 经验倍率：≤2 回合 2.0，≤5 回合 1.5，≤8 回合 1.2，再慢 1.0。"""
-    turns = max(1, int(turns))
-    for limit, multiplier in EXP_TURN_BANDS:
-        if turns <= limit:
-            return multiplier
-    return 1.0
-
-
-def battle_exp(kind: str, turns: int) -> int:
-    base = EXP_PER_BATTLE.get(kind, 5)
-    return max(1, int(round(base * turn_multiplier(turns))))
+REWARD_DEATH_RATE = 0.5        # 阵亡只带回一半鲸鳞
 
 
 # --------------------------------------------------------------------------

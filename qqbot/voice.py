@@ -693,12 +693,8 @@ def describe() -> str:
         )
     else:
         head = "发语音：没有可用引擎（装 edge-tts 或换 Windows）"
-    # AI 回复默认会自带一条语音条，启动日志里写清楚，免得以为机器人突然开始念话。
-    if VOICE_AI:
-        return head + "；@AI 的每条回复都补一条语音"
-    if VOICE_AI_SHORT:
-        return head + f"；@AI 回复里 ≤{VOICE_AI_SHORT_CHARS} 字的补一条语音"
-    return head + "；@AI 回复不念（QQCHATBOT_VOICE_AI_SHORT=0）"
+    # 语音条只在群友发「语音：…」时触发，AI 回复不会自动念一遍。
+    return head + "；只有发「语音：…」才念"
 
 
 def _tmp_dir() -> Path:

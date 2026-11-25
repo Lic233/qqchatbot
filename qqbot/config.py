@@ -369,23 +369,6 @@ GSV_PREWARM = os.getenv("QQCHATBOT_GSV_PREWARM", "").strip().lower() not in {
     "0", "false", "no", "off",
 }
 
-# 开了之后，@机器人 的 AI 回复除了文字还再念一条语音（不管多长都念）。
-# 默认关：每条回复多一次合成，慢 1~3 秒，还多占一条被动回复。
-VOICE_AI = os.getenv("QQCHATBOT_VOICE_AI", "").strip().lower() in {
-    "1", "true", "yes", "on",
-}
-
-# 短回复自带一条语音条：只念这么短以内的 AI 回复，长回复念起来拖沓就不念。
-# 和上面那个「全念」是两个独立开关，不用先开 QQCHATBOT_VOICE_AI。
-VOICE_AI_SHORT = os.getenv("QQCHATBOT_VOICE_AI_SHORT", "").strip().lower() not in {
-    "0", "false", "no", "off",
-}
-# 字数按原文算：AI 常回一两句短话，100 字差不多是三四行的量，
-# 念出来十几秒，群里不至于刷屏。
-VOICE_AI_SHORT_CHARS = int(
-    os.getenv("QQCHATBOT_VOICE_AI_SHORT_CHARS", "").strip() or 100
-)
-
 # --------------------------------------------------------------------------
 # 规则表（和原插件 config.py 保持一致）
 # --------------------------------------------------------------------------

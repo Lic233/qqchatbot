@@ -1,0 +1,1219 @@
+{
+  "_comment": "弗一把 · 困难模式新增题库（1.20.5 ~ 26.1），另外补了简单题库漏收的老物品（去皮原木 / 珊瑚 / 幽匿 / 唱片……）。与简单题库合并使用；同一个东西只收一条，变体写成 aliases；weight 是抽题权重（默认 1，越大越容易抽到）。",
+  "late_versions": ["1.20.5", "1.21", "1.21.2", "1.21.4", "1.21.5", "1.21.6", "1.21.9", "1.21.11", "26.1"],
+  "legacy_aliases": {
+    "纹样陶片": ["涡流纹样陶片", "旋风纹样陶片", "刮削纹样陶片"],
+    "锻造模板": ["镶铆锻造模板", "涡流锻造模板"],
+    "猪": ["温带猪", "寒带猪", "热带猪", "temperate_pig", "cold_pig", "warm_pig"],
+    "牛": ["温带牛", "寒带牛", "热带牛", "temperate_cow", "cold_cow", "warm_cow"],
+    "鸡": ["温带鸡", "寒带鸡", "热带鸡", "temperate_chicken", "cold_chicken", "warm_chicken"],
+    "蛋": ["鸡蛋", "蓝色鸡蛋", "棕色鸡蛋", "blue_egg", "brown_egg"],
+    "狼": ["苍狼", "森林狼", "灰狼", "黑狼", "栗色狼", "赭红狼", "斑点狼", "条纹狼", "雪狼"],
+    "锁链": ["铁链"],
+    "避雷针": ["斑驳避雷针", "锈蚀避雷针", "氧化避雷针"],
+    "铜块": ["斑驳的铜块", "锈蚀的铜块", "氧化的铜块", "涂蜡的铜块", "涂蜡的斑驳铜块", "涂蜡的锈蚀铜块", "涂蜡的氧化铜块"],
+    "切制铜块": ["斑驳的切制铜块", "锈蚀的切制铜块", "氧化的切制铜块", "涂蜡的切制铜块", "涂蜡的斑驳切制铜块", "涂蜡的锈蚀切制铜块", "涂蜡的氧化切制铜块"]
+  },
+  "items": [
+    {
+      "name": "犰狳", "version": "1.20.5", "type": "生物",
+      "tags": ["被动"], "world": "主世界",
+      "note": "一受惊就缩成方块，刷它能掉鳞甲。",
+      "aliases": ["armadillo"], "weight": 1
+    },
+    {
+      "name": "犰狳鳞甲", "version": "1.20.5", "type": "材料",
+      "tags": ["生物", "皮革"], "world": "主世界",
+      "note": "拿刷子刷成年犰狳才掉，做狼铠用。",
+      "aliases": ["armadillo_scute"], "weight": 1
+    },
+    {
+      "name": "狼铠", "version": "1.20.5", "type": "防具",
+      "tags": ["皮革", "战斗", "稀有"], "world": "无",
+      "note": "给狗穿的马甲，能染色，也能用鳞甲修。",
+      "aliases": ["wolf_armor"], "weight": 1
+    },
+    {
+      "name": "切制铜楼梯", "version": "1.17", "type": "方块",
+      "tags": ["金属", "建筑"], "world": "无",
+      "note": "切制铜块做的楼梯，放久了会一点点变绿。",
+      "aliases": ["cut_copper_stairs", "斑驳的切制铜楼梯", "锈蚀的切制铜楼梯", "氧化的切制铜楼梯", "涂蜡的切制铜楼梯", "涂蜡的斑驳切制铜楼梯", "涂蜡的锈蚀切制铜楼梯", "涂蜡的氧化切制铜楼梯"], "weight": 1
+    },
+    {
+      "name": "切制铜台阶", "version": "1.17", "type": "方块",
+      "tags": ["金属", "建筑"], "world": "无",
+      "note": "切制铜块做的半砖，氧化和涂蜡的写法都算它。",
+      "aliases": ["cut_copper_slab", "斑驳的切制铜台阶", "锈蚀的切制铜台阶", "氧化的切制铜台阶", "涂蜡的切制铜台阶", "涂蜡的斑驳切制铜台阶", "涂蜡的锈蚀切制铜台阶", "涂蜡的氧化切制铜台阶"], "weight": 1
+    },
+    {
+      "name": "雕纹铜块", "version": "1.21", "type": "方块",
+      "tags": ["金属", "装饰"], "world": "无",
+      "note": "铜块上压了个 X 花纹。",
+      "aliases": ["chiseled_copper", "斑驳的雕纹铜块", "锈蚀的雕纹铜块", "氧化的雕纹铜块", "涂蜡的雕纹铜块", "涂蜡的斑驳雕纹铜块", "涂蜡的锈蚀雕纹铜块", "涂蜡的氧化雕纹铜块"], "weight": 1
+    },
+    {
+      "name": "铜门", "version": "1.21", "type": "方块",
+      "tags": ["金属", "建筑"], "world": "主世界",
+      "note": "试炼密室里那种会自己氧化变绿的门。",
+      "aliases": ["copper_door", "斑驳的铜门", "锈蚀的铜门", "氧化的铜门", "涂蜡的铜门", "涂蜡的斑驳铜门", "涂蜡的锈蚀铜门", "涂蜡的氧化铜门"], "weight": 1
+    },
+    {
+      "name": "铜活板门", "version": "1.21", "type": "方块",
+      "tags": ["金属", "建筑"], "world": "主世界",
+      "note": "铜做的活板门，越放越绿。",
+      "aliases": ["copper_trapdoor", "斑驳的铜活板门", "锈蚀的铜活板门", "氧化的铜活板门", "涂蜡的铜活板门", "涂蜡的斑驳铜活板门", "涂蜡的锈蚀铜活板门", "涂蜡的氧化铜活板门"], "weight": 1
+    },
+    {
+      "name": "铜格栅", "version": "1.21", "type": "方块",
+      "tags": ["金属", "装饰"], "world": "主世界",
+      "note": "镂空的铜网，能透水。",
+      "aliases": ["copper_grate", "斑驳的铜格栅", "锈蚀的铜格栅", "氧化的铜格栅", "涂蜡的铜格栅", "涂蜡的斑驳铜格栅", "涂蜡的锈蚀铜格栅", "涂蜡的氧化铜格栅"], "weight": 1
+    },
+    {
+      "name": "铜灯", "version": "1.21", "type": "方块",
+      "tags": ["金属", "照明", "红石"], "world": "主世界",
+      "note": "通一下红石就开关，氧化后越来越暗。",
+      "aliases": ["copper_bulb", "斑驳的铜灯", "锈蚀的铜灯", "氧化的铜灯", "涂蜡的铜灯", "涂蜡的斑驳铜灯", "涂蜡的锈蚀铜灯", "涂蜡的氧化铜灯"], "weight": 1
+    },
+    {
+      "name": "凝灰岩楼梯", "version": "1.21", "type": "方块",
+      "tags": ["石材", "建筑"], "world": "主世界",
+      "note": "试炼密室里成片铺的灰楼梯。",
+      "aliases": ["tuff_stairs"], "weight": 1
+    },
+    {
+      "name": "凝灰岩台阶", "version": "1.21", "type": "方块",
+      "tags": ["石材", "建筑"], "world": "主世界",
+      "note": "凝灰岩切的半砖。",
+      "aliases": ["tuff_slab"], "weight": 1
+    },
+    {
+      "name": "凝灰岩墙", "version": "1.21", "type": "方块",
+      "tags": ["石材", "建筑"], "world": "主世界",
+      "note": "试炼密室走廊两侧的矮墙。",
+      "aliases": ["tuff_wall"], "weight": 1
+    },
+    {
+      "name": "雕纹凝灰岩", "version": "1.21", "type": "方块",
+      "tags": ["石材", "建筑"], "world": "主世界",
+      "note": "上面雕了花纹的凝灰岩。",
+      "aliases": ["chiseled_tuff"], "weight": 1
+    },
+    {
+      "name": "磨制凝灰岩", "version": "1.21", "type": "方块",
+      "tags": ["石材", "建筑"], "world": "无",
+      "note": "磨平的凝灰岩，能切楼梯台阶墙。",
+      "aliases": ["polished_tuff"], "weight": 1
+    },
+    {
+      "name": "磨制凝灰岩楼梯", "version": "1.21", "type": "方块",
+      "tags": ["石材", "建筑"], "world": "无",
+      "note": "磨制凝灰岩做的楼梯。",
+      "aliases": ["polished_tuff_stairs"], "weight": 1
+    },
+    {
+      "name": "磨制凝灰岩台阶", "version": "1.21", "type": "方块",
+      "tags": ["石材", "建筑"], "world": "无",
+      "note": "磨制凝灰岩做的半砖。",
+      "aliases": ["polished_tuff_slab"], "weight": 1
+    },
+    {
+      "name": "磨制凝灰岩墙", "version": "1.21", "type": "方块",
+      "tags": ["石材", "建筑"], "world": "无",
+      "note": "磨制凝灰岩砌的墙。",
+      "aliases": ["polished_tuff_wall"], "weight": 1
+    },
+    {
+      "name": "凝灰岩砖", "version": "1.21", "type": "方块",
+      "tags": ["石材", "建筑"], "world": "主世界",
+      "note": "凝灰岩切成的砖，试炼密室的主料。",
+      "aliases": ["tuff_bricks"], "weight": 1
+    },
+    {
+      "name": "凝灰岩砖楼梯", "version": "1.21", "type": "方块",
+      "tags": ["石材", "建筑"], "world": "无",
+      "note": "凝灰岩砖做的楼梯。",
+      "aliases": ["tuff_brick_stairs"], "weight": 1
+    },
+    {
+      "name": "凝灰岩砖台阶", "version": "1.21", "type": "方块",
+      "tags": ["石材", "建筑"], "world": "无",
+      "note": "凝灰岩砖做的半砖。",
+      "aliases": ["tuff_brick_slab"], "weight": 1
+    },
+    {
+      "name": "凝灰岩砖墙", "version": "1.21", "type": "方块",
+      "tags": ["石材", "建筑"], "world": "无",
+      "note": "凝灰岩砖砌的墙。",
+      "aliases": ["tuff_brick_wall"], "weight": 1
+    },
+    {
+      "name": "雕纹凝灰岩砖", "version": "1.21", "type": "方块",
+      "tags": ["石材", "建筑"], "world": "无",
+      "note": "凝灰岩砖上的雕花版本。",
+      "aliases": ["chiseled_tuff_bricks"], "weight": 1
+    },
+    {
+      "name": "试炼刷怪笼", "version": "1.21", "type": "方块",
+      "tags": ["红石", "稀有"], "world": "主世界",
+      "note": "打完一波才吐奖励，30 分钟后能再刷。",
+      "aliases": ["trial_spawner"], "weight": 1
+    },
+    {
+      "name": "宝库", "version": "1.21", "type": "方块",
+      "tags": ["存储", "稀有"], "world": "主世界",
+      "note": "拿试炼钥匙开，一个玩家只能开一次。",
+      "aliases": ["vault"], "weight": 1
+    },
+    {
+      "name": "合成器", "version": "1.21", "type": "方块",
+      "tags": ["红石", "存储", "金属"], "world": "无",
+      "note": "接上红石就自动合成，产物从正面吐出来。",
+      "aliases": ["crafter"], "weight": 1
+    },
+    {
+      "name": "沉重核心", "version": "1.21", "type": "方块",
+      "tags": ["金属", "稀有"], "world": "无",
+      "note": "宝库里的史诗材料，和旋风棒一起做重锤。",
+      "aliases": ["heavy_core"], "weight": 1
+    },
+    {
+      "name": "试炼钥匙", "version": "1.21", "type": "材料",
+      "tags": ["稀有", "金属"], "world": "无",
+      "note": "开普通宝库用，试炼密室的箱子里到处是。",
+      "aliases": ["trial_key"], "weight": 1
+    },
+    {
+      "name": "不祥试炼钥匙", "version": "1.21", "type": "材料",
+      "tags": ["稀有", "金属"], "world": "无",
+      "note": "不祥刷怪笼才掉，开不祥宝库。",
+      "aliases": ["ominous_trial_key"], "weight": 1
+    },
+    {
+      "name": "不祥之瓶", "version": "1.21", "type": "药水",
+      "tags": ["酿造", "稀有"], "world": "无",
+      "note": "喝下去挂一小时四十分钟的不祥之兆。",
+      "aliases": ["ominous_bottle"], "weight": 1
+    },
+    {
+      "name": "风弹", "version": "1.21", "type": "特殊",
+      "tags": ["战斗", "稀有"], "world": "无",
+      "note": "旋风人吐的那个，能把人弹飞、也能弹自己。",
+      "aliases": ["wind_charge"], "weight": 1
+    },
+    {
+      "name": "旋风棒", "version": "1.21", "type": "材料",
+      "tags": ["生物", "稀有"], "world": "无",
+      "note": "旋风人掉的，能拆成风弹，也能做重锤。",
+      "aliases": ["breeze_rod"], "weight": 1
+    },
+    {
+      "name": "重锤", "version": "1.21", "type": "武器",
+      "tags": ["金属", "战斗", "稀有"], "world": "无",
+      "note": "摔得越高砸得越狠，一下五十颗心不是梦。",
+      "aliases": ["mace"], "weight": 1
+    },
+    {
+      "name": "剧毒之箭", "version": "1.21", "type": "武器",
+      "tags": ["战斗", "酿造"], "world": "无",
+      "note": "沼骸射的就是它，中一箭挂中毒。",
+      "aliases": ["tipped_arrow_of_poison"], "weight": 1
+    },
+    {
+      "name": "蓄风药水", "version": "1.21", "type": "药水",
+      "tags": ["酿造", "稀有"], "world": "无",
+      "note": "蓄风药水：喝完整个人像风弹一样弹起来。",
+      "aliases": [], "weight": 1
+    },
+    {
+      "name": "盘丝药水", "version": "1.21", "type": "药水",
+      "tags": ["酿造", "稀有"], "world": "无",
+      "note": "盘丝药水：走过的地方全是蜘蛛网。",
+      "aliases": [], "weight": 1
+    },
+    {
+      "name": "渗浆药水", "version": "1.21", "type": "药水",
+      "tags": ["酿造", "稀有"], "world": "无",
+      "note": "渗浆药水：死后会分裂成两只小史莱姆。",
+      "aliases": [], "weight": 1
+    },
+    {
+      "name": "虫蚀药水", "version": "1.21", "type": "药水",
+      "tags": ["酿造", "稀有"], "world": "无",
+      "note": "虫蚀药水：挨打会掉出蠹虫。",
+      "aliases": [], "weight": 1
+    },
+    {
+      "name": "沼骸", "version": "1.21", "type": "生物",
+      "tags": ["敌对", "亡灵"], "world": "主世界",
+      "note": "沼泽里的骷髅变种，专射毒箭。",
+      "aliases": ["bogged"], "weight": 1
+    },
+    {
+      "name": "旋风人", "version": "1.21", "type": "生物",
+      "tags": ["敌对", "稀有"], "world": "主世界",
+      "note": "试炼密室里的风怪，飘着飘着就给你一发风弹。",
+      "aliases": ["breeze"], "weight": 1
+    },
+    {
+      "name": "收纳袋", "version": "1.21.2", "type": "特殊",
+      "tags": ["存储", "可染色"], "world": "无",
+      "note": "能塞一堆杂物的口袋，16 种颜色都有。",
+      "aliases": ["bundle"], "colored": true, "weight": 1
+    },
+    {
+      "name": "苍白橡木原木", "version": "1.21.4", "type": "方块",
+      "tags": ["木材", "建筑"], "world": "主世界",
+      "note": "苍白之园里那种灰白色的树。",
+      "aliases": ["pale_oak_log"], "weight": 1
+    },
+    {
+      "name": "苍白橡木", "version": "1.21.4", "type": "方块",
+      "tags": ["木材", "建筑"], "world": "主世界",
+      "note": "六面都是树皮的苍白橡木。",
+      "aliases": ["pale_oak_wood"], "weight": 1
+    },
+    {
+      "name": "苍白橡木木板", "version": "1.21.4", "type": "方块",
+      "tags": ["木材", "建筑"], "world": "主世界",
+      "note": "灰白色的木板，做阴森建筑很合适。",
+      "aliases": ["pale_oak_planks"], "weight": 1
+    },
+    {
+      "name": "苍白橡木楼梯", "version": "1.21.4", "type": "方块",
+      "tags": ["木材", "建筑"], "world": "无",
+      "note": "苍白橡木做的楼梯。",
+      "aliases": ["pale_oak_stairs"], "weight": 1
+    },
+    {
+      "name": "苍白橡木台阶", "version": "1.21.4", "type": "方块",
+      "tags": ["木材", "建筑"], "world": "无",
+      "note": "苍白橡木做的半砖。",
+      "aliases": ["pale_oak_slab"], "weight": 1
+    },
+    {
+      "name": "苍白橡木栅栏", "version": "1.21.4", "type": "方块",
+      "tags": ["木材", "建筑"], "world": "无",
+      "note": "苍白橡木做的栅栏。",
+      "aliases": ["pale_oak_fence"], "weight": 1
+    },
+    {
+      "name": "苍白橡木栅栏门", "version": "1.21.4", "type": "方块",
+      "tags": ["木材", "建筑"], "world": "无",
+      "note": "能开能关的苍白橡木栅栏。",
+      "aliases": ["pale_oak_fence_gate"], "weight": 1
+    },
+    {
+      "name": "苍白橡木门", "version": "1.21.4", "type": "方块",
+      "tags": ["木材", "建筑"], "world": "无",
+      "note": "苍白橡木做的门。",
+      "aliases": ["pale_oak_door"], "weight": 1
+    },
+    {
+      "name": "苍白橡木活板门", "version": "1.21.4", "type": "方块",
+      "tags": ["木材", "建筑"], "world": "无",
+      "note": "苍白橡木做的活板门。",
+      "aliases": ["pale_oak_trapdoor"], "weight": 1
+    },
+    {
+      "name": "苍白橡木按钮", "version": "1.21.4", "type": "方块",
+      "tags": ["木材", "红石"], "world": "无",
+      "note": "按一下发个短信号。",
+      "aliases": ["pale_oak_button"], "weight": 1
+    },
+    {
+      "name": "苍白橡木压力板", "version": "1.21.4", "type": "方块",
+      "tags": ["木材", "红石"], "world": "无",
+      "note": "踩上去就通电。",
+      "aliases": ["pale_oak_pressure_plate"], "weight": 1
+    },
+    {
+      "name": "苍白橡木告示牌", "version": "1.21.4", "type": "方块",
+      "tags": ["木材", "装饰"], "world": "无",
+      "note": "写点东西挂墙上。",
+      "aliases": ["pale_oak_sign"], "weight": 1
+    },
+    {
+      "name": "悬挂式苍白橡木告示牌", "version": "1.21.4", "type": "方块",
+      "tags": ["木材", "装饰"], "world": "无",
+      "note": "能挂在天花板上的告示牌。",
+      "aliases": ["pale_oak_hanging_sign"], "weight": 1
+    },
+    {
+      "name": "苍白橡树树叶", "version": "1.21.4", "type": "方块",
+      "tags": ["植物", "装饰"], "world": "主世界",
+      "note": "会往下飘灰色碎屑的叶子。",
+      "aliases": ["pale_oak_leaves"], "weight": 1
+    },
+    {
+      "name": "苍白橡树树苗", "version": "1.21.4", "type": "方块",
+      "tags": ["植物", "装饰"], "world": "主世界",
+      "note": "四个摆成 2×2 才能长成大树。",
+      "aliases": ["pale_oak_sapling"], "weight": 1
+    },
+    {
+      "name": "苍白垂须", "version": "1.21.4", "type": "方块",
+      "tags": ["植物", "装饰"], "world": "主世界",
+      "note": "从苍白的树冠垂下来的灰苔。",
+      "aliases": ["pale_hanging_moss"], "weight": 1
+    },
+    {
+      "name": "苍白苔藓块", "version": "1.21.4", "type": "方块",
+      "tags": ["植物", "装饰"], "world": "主世界",
+      "note": "苍白之园地上铺的灰苔藓。",
+      "aliases": ["pale_moss_block"], "weight": 1
+    },
+    {
+      "name": "苍白覆地苔藓", "version": "1.21.4", "type": "方块",
+      "tags": ["植物", "装饰"], "world": "主世界",
+      "note": "薄薄一层，还会往旁边爬。",
+      "aliases": ["pale_moss_carpet"], "weight": 1
+    },
+    {
+      "name": "嘎枝之心", "version": "1.21.4", "type": "方块",
+      "tags": ["生物", "稀有"], "world": "主世界",
+      "note": "藏在苍白橡树里，晚上会放出嘎枝。",
+      "aliases": ["creaking_heart"], "weight": 1
+    },
+    {
+      "name": "树脂块", "version": "1.21.4", "type": "方块",
+      "tags": ["生物", "装饰"], "world": "主世界",
+      "note": "九个树脂团压一块，橙得发亮。",
+      "aliases": ["resin_block"], "weight": 1
+    },
+    {
+      "name": "树脂团", "version": "1.21.4", "type": "方块",
+      "tags": ["生物", "装饰"], "world": "主世界",
+      "note": "嘎枝之心掉下来的橙色疙瘩。",
+      "aliases": ["resin_clump"], "weight": 1
+    },
+    {
+      "name": "树脂砖块", "version": "1.21.4", "type": "方块",
+      "tags": ["石材", "建筑"], "world": "无",
+      "note": "树脂砖烧出来的橙色砖块。",
+      "aliases": ["resin_bricks"], "weight": 1
+    },
+    {
+      "name": "雕纹树脂砖", "version": "1.21.4", "type": "方块",
+      "tags": ["石材", "建筑"], "world": "无",
+      "note": "树脂砖上的雕花版本。",
+      "aliases": ["chiseled_resin_bricks"], "weight": 1
+    },
+    {
+      "name": "树脂砖台阶", "version": "1.21.4", "type": "方块",
+      "tags": ["石材", "建筑"], "world": "无",
+      "note": "树脂砖做的半砖。",
+      "aliases": ["resin_brick_slab"], "weight": 1
+    },
+    {
+      "name": "树脂砖楼梯", "version": "1.21.4", "type": "方块",
+      "tags": ["石材", "建筑"], "world": "无",
+      "note": "树脂砖做的楼梯。",
+      "aliases": ["resin_brick_stairs"], "weight": 1
+    },
+    {
+      "name": "树脂砖墙", "version": "1.21.4", "type": "方块",
+      "tags": ["石材", "建筑"], "world": "无",
+      "note": "树脂砖砌的墙。",
+      "aliases": ["resin_brick_wall"], "weight": 1
+    },
+    {
+      "name": "眼眸花", "version": "1.21.4", "type": "方块",
+      "tags": ["植物", "装饰"], "world": "主世界",
+      "note": "白天闭着、晚上睁开，张开的还会发光。",
+      "aliases": ["eyeblossom", "张开的眼眸花", "闭合的眼眸花"], "weight": 1
+    },
+    {
+      "name": "苍白橡木船", "version": "1.21.4", "type": "工具",
+      "tags": ["木材", "交通"], "world": "无",
+      "note": "苍白橡木做的船，过河跑图都能用。",
+      "aliases": ["pale_oak_boat"], "weight": 1
+    },
+    {
+      "name": "树脂砖", "version": "1.21.4", "type": "材料",
+      "tags": ["生物", "建筑"], "world": "无",
+      "note": "树脂团烧出来的橙砖，能做纹饰。",
+      "aliases": ["resin_brick"], "weight": 1
+    },
+    {
+      "name": "嘎枝", "version": "1.21.4", "type": "生物",
+      "tags": ["敌对", "稀有"], "world": "主世界",
+      "note": "你盯着它它就不动，得去砍它的心。",
+      "aliases": ["creaking"], "weight": 1
+    },
+    {
+      "name": "枯叶堆", "version": "1.21.5", "type": "方块",
+      "tags": ["植物", "装饰"], "world": "主世界",
+      "note": "森林地上那层能一片片铺的落叶。",
+      "aliases": ["leaf_litter"], "weight": 1
+    },
+    {
+      "name": "野花簇", "version": "1.21.5", "type": "方块",
+      "tags": ["植物", "装饰"], "world": "主世界",
+      "note": "白桦林和草甸里一小撮一小撮的野花。",
+      "aliases": ["wildflowers"], "weight": 1
+    },
+    {
+      "name": "灌木丛", "version": "1.21.5", "type": "方块",
+      "tags": ["植物", "装饰"], "world": "主世界",
+      "note": "没有刺的小灌木，走过去会被绊一下。",
+      "aliases": ["bush"], "weight": 1
+    },
+    {
+      "name": "萤火虫灌木丛", "version": "1.21.5", "type": "方块",
+      "tags": ["植物", "照明"], "world": "主世界",
+      "note": "夜里会飘出萤火虫的草丛。",
+      "aliases": ["firefly_bush"], "weight": 1
+    },
+    {
+      "name": "仙人掌花", "version": "1.21.5", "type": "方块",
+      "tags": ["植物", "装饰"], "world": "主世界",
+      "note": "长在仙人掌顶上的粉色小花。",
+      "aliases": ["cactus_flower"], "weight": 1
+    },
+    {
+      "name": "矮枯草丛", "version": "1.21.5", "type": "方块",
+      "tags": ["植物", "装饰"], "world": "主世界",
+      "note": "沙漠里一格高的枯草。",
+      "aliases": ["short_dry_grass"], "weight": 1
+    },
+    {
+      "name": "高枯草丛", "version": "1.21.5", "type": "方块",
+      "tags": ["植物", "装饰"], "world": "主世界",
+      "note": "沙漠里两格高的枯草。",
+      "aliases": ["tall_dry_grass"], "weight": 1
+    },
+    {
+      "name": "失水恶魂", "version": "1.21.6", "type": "方块",
+      "tags": ["生物", "稀有"], "world": "下界",
+      "note": "泡进水里二十分钟，会孵出小恶魂。",
+      "aliases": ["dried_ghast"], "weight": 1
+    },
+    {
+      "name": "挽具", "version": "1.21.6", "type": "工具",
+      "tags": ["皮革", "交通", "可染色"], "world": "无",
+      "note": "给快乐恶魂套上就能骑，16 种颜色都有。",
+      "aliases": ["harness"], "colored": true, "weight": 1
+    },
+    {
+      "name": "快乐恶魂", "version": "1.21.6", "type": "生物",
+      "tags": ["被动", "可驯服"], "world": "主世界",
+      "note": "套上挽具能载四个人飞，雨天回血更快。",
+      "aliases": ["happy_ghast"], "weight": 1
+    },
+    {
+      "name": "小恶魂", "version": "1.21.6", "type": "生物",
+      "tags": ["被动"], "world": "主世界",
+      "note": "快乐恶魂的小时候，喂雪球长得快。",
+      "aliases": ["ghastling"], "weight": 1
+    },
+    {
+      "name": "铜箱子", "version": "1.21.9", "type": "方块",
+      "tags": ["金属", "存储"], "world": "无",
+      "note": "会氧化的箱子，铜傀儡专门往里搬东西。",
+      "aliases": ["copper_chest", "斑驳的铜箱子", "锈蚀的铜箱子", "氧化的铜箱子", "涂蜡的铜箱子", "涂蜡的斑驳铜箱子", "涂蜡的锈蚀铜箱子", "涂蜡的氧化铜箱子"], "weight": 1
+    },
+    {
+      "name": "铜傀儡像", "version": "1.21.9", "type": "方块",
+      "tags": ["金属", "装饰"], "world": "无",
+      "note": "铜傀儡氧化到头之后的雕像，能摆姿势。",
+      "aliases": ["copper_golem_statue", "斑驳的铜傀儡像", "锈蚀的铜傀儡像", "氧化的铜傀儡像", "涂蜡的铜傀儡像", "涂蜡的斑驳铜傀儡像", "涂蜡的锈蚀铜傀儡像", "涂蜡的氧化铜傀儡像"], "weight": 1
+    },
+    {
+      "name": "展示架", "version": "1.21.9", "type": "方块",
+      "tags": ["木材", "存储", "装饰"], "world": "无",
+      "note": "正面三个格子，12 种木头都有。",
+      "aliases": ["shelf", "橡木展示架", "云杉木展示架", "白桦木展示架", "丛林木展示架", "金合欢木展示架", "深色橡木展示架", "红树木展示架", "樱花木展示架", "竹展示架", "绯红木展示架", "诡异木展示架", "苍白橡木展示架"], "weight": 1
+    },
+    {
+      "name": "铜火把", "version": "1.21.9", "type": "方块",
+      "tags": ["金属", "照明"], "world": "无",
+      "note": "绿色的火把，铜粒加煤炭做的。",
+      "aliases": ["copper_torch"], "weight": 1
+    },
+    {
+      "name": "铜栏杆", "version": "1.21.9", "type": "方块",
+      "tags": ["金属", "建筑"], "world": "无",
+      "note": "铁栏杆的铜版本，放久了会绿。",
+      "aliases": ["copper_bars", "斑驳的铜栏杆", "锈蚀的铜栏杆", "氧化的铜栏杆", "涂蜡的铜栏杆", "涂蜡的斑驳铜栏杆", "涂蜡的锈蚀铜栏杆", "涂蜡的氧化铜栏杆"], "weight": 1
+    },
+    {
+      "name": "铜链", "version": "1.21.9", "type": "方块",
+      "tags": ["金属", "装饰"], "world": "无",
+      "note": "挂灯笼用的铜链子，也会氧化。",
+      "aliases": ["copper_chain", "斑驳的铜链", "锈蚀的铜链", "氧化的铜链", "涂蜡的铜链", "涂蜡的斑驳铜链", "涂蜡的锈蚀铜链", "涂蜡的氧化铜链"], "weight": 1
+    },
+    {
+      "name": "铜灯笼", "version": "1.21.9", "type": "方块",
+      "tags": ["金属", "照明"], "world": "无",
+      "note": "铜做的灯笼，亮度和普通灯笼一样。",
+      "aliases": ["copper_lantern", "斑驳的铜灯笼", "锈蚀的铜灯笼", "氧化的铜灯笼", "涂蜡的铜灯笼", "涂蜡的斑驳铜灯笼", "涂蜡的锈蚀铜灯笼", "涂蜡的氧化铜灯笼"], "weight": 1
+    },
+    {
+      "name": "铜头盔", "version": "1.21.9", "type": "防具",
+      "tags": ["金属", "战斗"], "world": "无",
+      "note": "比皮革强一点，比金稍微结实。",
+      "aliases": ["copper_helmet"], "weight": 1
+    },
+    {
+      "name": "铜胸甲", "version": "1.21.9", "type": "防具",
+      "tags": ["金属", "战斗"], "world": "无",
+      "note": "铜做的胸甲，过渡期穿挺合适。",
+      "aliases": ["copper_chestplate"], "weight": 1
+    },
+    {
+      "name": "铜护腿", "version": "1.21.9", "type": "防具",
+      "tags": ["金属", "战斗"], "world": "无",
+      "note": "铜做的护腿。",
+      "aliases": ["copper_leggings"], "weight": 1
+    },
+    {
+      "name": "铜靴子", "version": "1.21.9", "type": "防具",
+      "tags": ["金属", "战斗"], "world": "无",
+      "note": "铜做的靴子。",
+      "aliases": ["copper_boots"], "weight": 1
+    },
+    {
+      "name": "铜马铠", "version": "1.21.9", "type": "防具",
+      "tags": ["金属", "交通"], "world": "无",
+      "note": "四点护甲，战利品箱里能翻到。",
+      "aliases": ["copper_horse_armor"], "weight": 1
+    },
+    {
+      "name": "铜剑", "version": "1.21.9", "type": "武器",
+      "tags": ["金属", "战斗"], "world": "无",
+      "note": "伤害跟石剑一样，但更耐用、更好附魔。",
+      "aliases": ["copper_sword"], "weight": 1
+    },
+    {
+      "name": "铜镐", "version": "1.21.9", "type": "工具",
+      "tags": ["金属", "采集"], "world": "无",
+      "note": "挖得比石镐快，比铁镐慢。",
+      "aliases": ["copper_pickaxe"], "weight": 1
+    },
+    {
+      "name": "铜斧", "version": "1.21.9", "type": "工具",
+      "tags": ["金属", "采集"], "world": "无",
+      "note": "砍树砍怪都能用。",
+      "aliases": ["copper_axe"], "weight": 1
+    },
+    {
+      "name": "铜锹", "version": "1.21.9", "type": "工具",
+      "tags": ["金属", "采集"], "world": "无",
+      "note": "挖土挖沙。",
+      "aliases": ["copper_shovel"], "weight": 1
+    },
+    {
+      "name": "铜锄", "version": "1.21.9", "type": "工具",
+      "tags": ["金属", "采集"], "world": "无",
+      "note": "种地用的。",
+      "aliases": ["copper_hoe"], "weight": 1
+    },
+    {
+      "name": "铜粒", "version": "1.21.9", "type": "材料",
+      "tags": ["金属"], "world": "无",
+      "note": "一个铜锭能分成九个，铜装备烧了也出它。",
+      "aliases": ["copper_nugget"], "weight": 1
+    },
+    {
+      "name": "铜傀儡", "version": "1.21.9", "type": "生物",
+      "tags": ["中立"], "world": "主世界",
+      "note": "南瓜头加铜块召唤，专门帮你整理箱子。",
+      "aliases": ["copper_golem"], "weight": 1
+    },
+    {
+      "name": "鹦鹉螺铠", "version": "1.21.11", "type": "防具",
+      "tags": ["生物", "战斗", "稀有"], "world": "无",
+      "note": "给鹦鹉螺穿的鞍甲，铜铁金钻石下界合金五种。",
+      "aliases": ["nautilus_armor", "铜鹦鹉螺铠", "铁鹦鹉螺铠", "金鹦鹉螺铠", "钻石鹦鹉螺铠", "下界合金鹦鹉螺铠"], "weight": 1
+    },
+    {
+      "name": "下界合金马铠", "version": "1.21.11", "type": "防具",
+      "tags": ["金属", "交通", "稀有"], "world": "无",
+      "note": "钻石马铠加下界合金锭升级出来的。",
+      "aliases": ["netherite_horse_armor"], "weight": 1
+    },
+    {
+      "name": "矛", "version": "1.21.11", "type": "武器",
+      "tags": ["战斗"], "world": "无",
+      "note": "七种材质都叫这个名字，冲得越快戳得越疼。",
+      "aliases": ["spear", "木矛", "石矛", "铜矛", "铁矛", "金矛", "钻石矛", "下界合金矛", "wooden_spear", "stone_spear", "copper_spear", "iron_spear", "golden_spear", "diamond_spear", "netherite_spear"], "weight": 1
+    },
+    {
+      "name": "鹦鹉螺", "version": "1.21.11", "type": "生物",
+      "tags": ["中立", "可驯服"], "world": "主世界",
+      "note": "喂河豚能驯服，骑上它氧气条就不掉了。",
+      "aliases": ["nautilus"], "weight": 1
+    },
+    {
+      "name": "僵尸鹦鹉螺", "version": "1.21.11", "type": "生物",
+      "tags": ["中立", "亡灵"], "world": "主世界",
+      "note": "背上常驮着拿三叉戟的溺尸，白天会烧。",
+      "aliases": ["zombie_nautilus"], "weight": 1
+    },
+    {
+      "name": "骆驼尸壳", "version": "1.21.11", "type": "生物",
+      "tags": ["中立", "亡灵", "可驯服"], "world": "主世界",
+      "note": "沙漠里的亡灵骆驼，背上还坐着两个骑手。",
+      "aliases": ["camel_husk"], "weight": 1
+    },
+    {
+      "name": "焦骸", "version": "1.21.11", "type": "生物",
+      "tags": ["敌对", "亡灵"], "world": "主世界",
+      "note": "沙漠骷髅变种，太阳晒不化，专射虚弱箭。",
+      "aliases": ["parched"], "weight": 1
+    },
+    {
+      "name": "木棍", "version": "远古", "type": "材料",
+      "tags": ["木材"], "world": "无",
+      "note": "两块木板竖着摆一根，合成的基础。",
+      "aliases": ["stick"], "weight": 1
+    },
+    {
+      "name": "碗", "version": "远古", "type": "材料",
+      "tags": ["木材"], "world": "无",
+      "note": "三块木板拼个碗，装汤用。",
+      "aliases": ["bowl"], "weight": 1
+    },
+    {
+      "name": "燧石", "version": "远古", "type": "材料",
+      "tags": ["矿物"], "world": "主世界",
+      "note": "挖沙砾偶尔掉，打火石和箭都要它。",
+      "aliases": ["flint"], "weight": 1
+    },
+    {
+      "name": "金粒", "version": "1.0", "type": "材料",
+      "tags": ["金属"], "world": "无",
+      "note": "九个金粒换一个金锭。",
+      "aliases": ["gold_nugget"], "weight": 1
+    },
+    {
+      "name": "红砖", "version": "远古", "type": "材料",
+      "tags": ["石材"], "world": "无",
+      "note": "黏土烧出来的砖，砌砖块用。",
+      "aliases": ["brick"], "weight": 1
+    },
+    {
+      "name": "下界砖", "version": "远古", "type": "材料",
+      "tags": ["石材"], "world": "下界",
+      "note": "下界岩烧出来的砖。",
+      "aliases": ["nether_brick"], "weight": 1
+    },
+    {
+      "name": "雪球", "version": "远古", "type": "材料",
+      "tags": ["地形"], "world": "主世界",
+      "note": "四个压一块雪块，也能砸人。",
+      "aliases": ["snowball"], "weight": 1
+    },
+    {
+      "name": "黏液块", "version": "1.8", "type": "方块",
+      "tags": ["生物", "装饰"], "world": "无",
+      "note": "九个黏液球压一块，弹来弹去。",
+      "aliases": ["slime_block"], "weight": 1
+    },
+    {
+      "name": "岩浆膏", "version": "1.0", "type": "材料",
+      "tags": ["生物", "酿造"], "world": "下界",
+      "note": "岩浆怪掉的，抗火药水要用。",
+      "aliases": ["magma_cream"], "weight": 1
+    },
+    {
+      "name": "附魔之瓶", "version": "1.4", "type": "材料",
+      "tags": ["稀有"], "world": "无",
+      "note": "砸开给一丢丢经验，村民也收。",
+      "aliases": ["experience_bottle", "附魔瓶"], "weight": 1
+    },
+    {
+      "name": "烟花之星", "version": "1.4", "type": "材料",
+      "tags": ["战斗", "装饰"], "world": "无",
+      "note": "烟花的弹头，加染料就变色。",
+      "aliases": ["firework_star"], "weight": 1
+    },
+    {
+      "name": "书与笔", "version": "1.4", "type": "工具",
+      "tags": ["植物", "装饰"], "world": "无",
+      "note": "写完署名就变成书。",
+      "aliases": ["writable_book", "书笔"], "weight": 1
+    },
+    {
+      "name": "成书", "version": "1.4", "type": "工具",
+      "tags": ["植物", "装饰"], "world": "无",
+      "note": "写完署名的书，能放进讲台。",
+      "aliases": ["written_book"], "weight": 1
+    },
+    {
+      "name": "音乐唱片", "version": "远古", "type": "特殊",
+      "tags": ["装饰", "稀有"], "world": "无",
+      "note": "十几张曲子都算它，放进唱片机就能听。",
+      "aliases": ["唱片", "music_disc"], "weight": 1
+    },
+    {
+      "name": "旗帜图案", "version": "1.14", "type": "材料",
+      "tags": ["植物", "装饰"], "world": "无",
+      "note": "织布机用的图案纸，苦力怕、花朵那些都算。",
+      "aliases": ["banner_pattern"], "weight": 1
+    },
+    {
+      "name": "刷怪蛋", "version": "远古", "type": "特殊",
+      "tags": ["生物", "稀有"], "world": "无",
+      "note": "每种生物的刷怪蛋都算它。",
+      "aliases": ["spawn_egg"], "weight": 1
+    },
+    {
+      "name": "砂轮", "version": "1.14", "type": "方块",
+      "tags": ["石材", "装饰"], "world": "主世界",
+      "note": "修装备、洗掉附魔的砂轮。",
+      "aliases": ["grindstone"], "weight": 1
+    },
+    {
+      "name": "制箭台", "version": "1.14", "type": "方块",
+      "tags": ["木材", "装饰"], "world": "主世界",
+      "note": "做箭的工作站。",
+      "aliases": ["fletching_table"], "weight": 1
+    },
+    {
+      "name": "锻造台", "version": "1.14", "type": "方块",
+      "tags": ["金属", "装饰"], "world": "主世界",
+      "note": "升级下界合金装备用的台子。",
+      "aliases": ["smithing_table"], "weight": 1
+    },
+    {
+      "name": "钟", "version": "1.14", "type": "方块",
+      "tags": ["金属", "装饰"], "world": "主世界",
+      "note": "村庄广场那口钟，敲一下全村都听见。",
+      "aliases": ["bell", "村庄钟"], "weight": 1
+    },
+    {
+      "name": "灵魂营火", "version": "1.16", "type": "方块",
+      "tags": ["木材", "照明", "烹饪"], "world": "无",
+      "note": "蓝色火的营火，灵魂沙点的。",
+      "aliases": ["soul_campfire"], "weight": 1
+    },
+    {
+      "name": "磁石", "version": "1.16", "type": "方块",
+      "tags": ["金属", "装饰"], "world": "无",
+      "note": "下界合金加雕纹石砖，指南针绑上去就不乱转。",
+      "aliases": ["lodestone"], "weight": 1
+    },
+    {
+      "name": "遮光玻璃", "version": "1.17", "type": "方块",
+      "tags": ["石材", "装饰"], "world": "无",
+      "note": "不透光的玻璃，紫水晶做的。",
+      "aliases": ["tinted_glass"], "weight": 1
+    },
+    {
+      "name": "苔藓块", "version": "1.17", "type": "方块",
+      "tags": ["植物", "装饰"], "world": "主世界",
+      "note": "繁茂洞穴地上那层绿。",
+      "aliases": ["moss_block"], "weight": 1
+    },
+    {
+      "name": "杜鹃花丛", "version": "1.17", "type": "方块",
+      "tags": ["植物", "装饰"], "world": "主世界",
+      "note": "开粉花的杜鹃丛。",
+      "aliases": ["azalea"], "weight": 1
+    },
+    {
+      "name": "盛开的杜鹃花丛", "version": "1.17", "type": "方块",
+      "tags": ["植物", "装饰"], "world": "主世界",
+      "note": "花开满的那种杜鹃丛。",
+      "aliases": ["flowering_azalea"], "weight": 1
+    },
+    {
+      "name": "杜鹃树叶", "version": "1.17", "type": "方块",
+      "tags": ["植物", "装饰"], "world": "主世界",
+      "note": "杜鹃树的叶子。",
+      "aliases": ["azalea_leaves"], "weight": 1
+    },
+    {
+      "name": "洞穴藤蔓", "version": "1.17", "type": "方块",
+      "tags": ["植物", "装饰"], "world": "主世界",
+      "note": "会结发光浆果的藤。",
+      "aliases": ["cave_vines"], "weight": 1
+    },
+    {
+      "name": "小型垂滴叶", "version": "1.17", "type": "方块",
+      "tags": ["植物", "装饰"], "world": "主世界",
+      "note": "踩上去会弹一下的小叶子。",
+      "aliases": ["small_dripleaf"], "weight": 1
+    },
+    {
+      "name": "大型垂滴叶", "version": "1.17", "type": "方块",
+      "tags": ["植物", "装饰"], "world": "主世界",
+      "note": "能用骨粉催高，站上去会塌。",
+      "aliases": ["big_dripleaf"], "weight": 1
+    },
+    {
+      "name": "缠根泥土", "version": "1.17", "type": "方块",
+      "tags": ["植物", "地形"], "world": "主世界",
+      "note": "长满根的泥土，杜鹃树下面那层。",
+      "aliases": ["rooted_dirt"], "weight": 1
+    },
+    {
+      "name": "紫晶芽", "version": "1.17", "type": "方块",
+      "tags": ["宝石", "装饰"], "world": "主世界",
+      "note": "小型 / 中型 / 大型三种芽都算它。",
+      "aliases": ["小型紫晶芽", "中型紫晶芽", "大型紫晶芽", "amethyst_bud"], "weight": 1
+    },
+    {
+      "name": "紫水晶母岩", "version": "1.17", "type": "方块",
+      "tags": ["宝石", "稀有"], "world": "主世界",
+      "note": "紫晶芽长在上面的那块石头。",
+      "aliases": ["budding_amethyst"], "weight": 1
+    },
+    {
+      "name": "幽匿块", "version": "1.19", "type": "方块",
+      "tags": ["生物", "装饰"], "world": "主世界",
+      "note": "古城地上那种会吸收声音的方块。",
+      "aliases": ["sculk"], "weight": 1
+    },
+    {
+      "name": "幽匿催发体", "version": "1.19", "type": "方块",
+      "tags": ["生物", "稀有"], "world": "主世界",
+      "note": "有生物死在上面会长出幽匿。",
+      "aliases": ["sculk_catalyst"], "weight": 1
+    },
+    {
+      "name": "幽匿尖啸体", "version": "1.19", "type": "方块",
+      "tags": ["生物", "稀有"], "world": "主世界",
+      "note": "尖叫几次就会把监守者叫出来。",
+      "aliases": ["sculk_shrieker"], "weight": 1
+    },
+    {
+      "name": "幽匿脉络", "version": "1.19", "type": "方块",
+      "tags": ["生物", "装饰"], "world": "主世界",
+      "note": "幽匿块上那层蓝色脉络。",
+      "aliases": ["sculk_vein"], "weight": 1
+    },
+    {
+      "name": "幽匿感测体", "version": "1.19", "type": "方块",
+      "tags": ["红石", "生物"], "world": "主世界",
+      "note": "听到振动就发红石信号。",
+      "aliases": ["sculk_sensor"], "weight": 1
+    },
+    {
+      "name": "红树根", "version": "1.19", "type": "方块",
+      "tags": ["植物", "装饰"], "world": "主世界",
+      "note": "红树林水里那些根。",
+      "aliases": ["mangrove_roots"], "weight": 1
+    },
+    {
+      "name": "红树胎生苗", "version": "1.19", "type": "方块",
+      "tags": ["植物", "装饰"], "world": "主世界",
+      "note": "红树的树苗，能种回红树。",
+      "aliases": ["mangrove_propagule"], "weight": 1
+    },
+    {
+      "name": "樱花树苗", "version": "1.20", "type": "方块",
+      "tags": ["植物", "装饰"], "world": "主世界",
+      "note": "种下去长樱花树。",
+      "aliases": ["cherry_sapling"], "weight": 1
+    },
+    {
+      "name": "粉红色花簇", "version": "1.20", "type": "方块",
+      "tags": ["植物", "装饰"], "world": "主世界",
+      "note": "樱花树林地上那层粉色小花。",
+      "aliases": ["pink_petals"], "weight": 1
+    },
+    {
+      "name": "下界金矿石", "version": "1.16", "type": "方块",
+      "tags": ["矿物", "金属"], "world": "下界",
+      "note": "下界挖的金矿，猪灵最爱。",
+      "aliases": ["nether_gold_ore"], "weight": 1
+    },
+    {
+      "name": "绯红菌岩", "version": "1.16", "type": "方块",
+      "tags": ["植物", "地形"], "world": "下界",
+      "note": "绯红森林的地面。",
+      "aliases": ["crimson_nylium"], "weight": 1
+    },
+    {
+      "name": "诡异菌岩", "version": "1.16", "type": "方块",
+      "tags": ["植物", "地形"], "world": "下界",
+      "note": "诡异森林的地面。",
+      "aliases": ["warped_nylium"], "weight": 1
+    },
+    {
+      "name": "下界砖栅栏", "version": "1.16", "type": "方块",
+      "tags": ["石材", "建筑"], "world": "无",
+      "note": "下界砖砌的栅栏。",
+      "aliases": ["nether_brick_fence"], "weight": 1
+    },
+    {
+      "name": "石英砖台阶", "version": "1.14", "type": "方块",
+      "tags": ["石材", "建筑"], "world": "无",
+      "note": "石英砖切的半砖。",
+      "aliases": ["quartz_brick_slab"], "weight": 1
+    },
+    {
+      "name": "石英砖楼梯", "version": "1.14", "type": "方块",
+      "tags": ["石材", "建筑"], "world": "无",
+      "note": "石英砖切的楼梯。",
+      "aliases": ["quartz_brick_stairs"], "weight": 1
+    },
+    {
+      "name": "石按钮", "version": "1.13", "type": "方块",
+      "tags": ["石材", "红石"], "world": "无",
+      "note": "石头做的按钮。",
+      "aliases": ["stone_button"], "weight": 1
+    },
+    {
+      "name": "石压力板", "version": "1.13", "type": "方块",
+      "tags": ["石材", "红石"], "world": "无",
+      "note": "石头做的压力板。",
+      "aliases": ["stone_pressure_plate"], "weight": 1
+    },
+    {
+      "name": "轻质测重压力板", "version": "1.15", "type": "方块",
+      "tags": ["金属", "红石"], "world": "无",
+      "note": "金做的，东西越多信号越强。",
+      "aliases": ["light_weighted_pressure_plate"], "weight": 1
+    },
+    {
+      "name": "重质测重压力板", "version": "1.15", "type": "方块",
+      "tags": ["金属", "红石"], "world": "无",
+      "note": "铁做的，按数量分档。",
+      "aliases": ["heavy_weighted_pressure_plate"], "weight": 1
+    },
+    {
+      "name": "磨制黑石按钮", "version": "1.16", "type": "方块",
+      "tags": ["石材", "红石"], "world": "无",
+      "note": "磨制黑石做的按钮。",
+      "aliases": ["polished_blackstone_button"], "weight": 1
+    },
+    {
+      "name": "磨制黑石压力板", "version": "1.16", "type": "方块",
+      "tags": ["石材", "红石"], "world": "无",
+      "note": "磨制黑石做的压力板。",
+      "aliases": ["polished_blackstone_pressure_plate"], "weight": 1
+    },
+    {
+      "name": "去皮原木", "version": "1.13", "type": "方块",
+      "tags": ["木材", "建筑"], "world": "主世界",
+      "note": "八种木头去皮后的原木都算它。",
+      "aliases": ["去皮橡木原木", "去皮云杉原木", "去皮白桦原木", "去皮丛林原木", "去皮金合欢原木", "去皮深色橡木原木", "去皮红树原木", "去皮樱花原木", "stripped_oak", "stripped_spruce", "stripped_birch", "stripped_jungle", "stripped_acacia", "stripped_dark_oak", "stripped_mangrove", "stripped_cherry", "stripped_log"], "weight": 1
+    },
+    {
+      "name": "木头", "version": "1.3", "type": "方块",
+      "tags": ["木材", "建筑"], "world": "主世界",
+      "note": "六面都是树皮的木头，八种树都算它。",
+      "aliases": ["橡木", "云杉木", "白桦木", "丛林木", "金合欢木", "深色橡木", "红树木", "樱花木", "oak_wood", "spruce_wood", "birch_wood", "jungle_wood", "acacia_wood", "dark_oak_wood", "mangrove_wood", "cherry_wood"], "weight": 1
+    },
+    {
+      "name": "去皮木头", "version": "1.13", "type": "方块",
+      "tags": ["木材", "建筑"], "world": "主世界",
+      "note": "去皮之后的木头，八种树都算它。",
+      "aliases": ["去皮橡木", "去皮云杉木", "去皮白桦木", "去皮丛林木", "去皮金合欢木", "去皮深色橡木", "去皮红树木", "去皮樱花木", "stripped_oak_wood", "stripped_spruce_wood", "stripped_birch_wood", "stripped_jungle_wood", "stripped_acacia_wood", "stripped_dark_oak_wood", "stripped_mangrove_wood", "stripped_cherry_wood"], "weight": 1
+    },
+    {
+      "name": "去皮菌柄", "version": "1.16", "type": "方块",
+      "tags": ["木材", "建筑"], "world": "下界",
+      "note": "绯红 / 诡异菌柄的去皮版本。",
+      "aliases": ["去皮绯红菌柄", "去皮诡异菌柄", "stripped_crimson_stem", "stripped_warped_stem"], "weight": 1
+    },
+    {
+      "name": "去皮竹块", "version": "1.20", "type": "方块",
+      "tags": ["植物", "建筑"], "world": "主世界",
+      "note": "竹块去掉外皮之后的版本。",
+      "aliases": ["stripped_bamboo_block"], "weight": 1
+    },
+    {
+      "name": "运输船", "version": "1.9", "type": "工具",
+      "tags": ["木材", "交通"], "world": "无",
+      "note": "带箱子的船，十一种都算它。",
+      "aliases": ["橡木运输船", "云杉木运输船", "白桦木运输船", "丛林运输船", "金合欢运输船", "深色橡木运输船", "红树运输船", "樱花运输船", "竹运输筏", "苍白橡木运输船", "boat_with_chest", "chest_boat"], "weight": 1
+    },
+    {
+      "name": "珊瑚", "version": "1.13", "type": "方块",
+      "tags": ["植物", "装饰"], "world": "主世界",
+      "note": "五种活珊瑚（含失活的）都算它。",
+      "aliases": ["管珊瑚", "脑纹珊瑚", "气泡珊瑚", "火珊瑚", "鹿角珊瑚", "失活的管珊瑚", "失活的脑纹珊瑚", "失活的气泡珊瑚", "失活的火珊瑚", "失活的鹿角珊瑚"], "weight": 1
+    },
+    {
+      "name": "树苗", "version": "远古", "type": "方块",
+      "tags": ["植物", "装饰"], "world": "主世界",
+      "note": "橡树 / 云杉 / 白桦 / 丛林 / 金合欢 / 深色橡树的树苗都算它。",
+      "aliases": ["橡树树苗", "云杉树苗", "白桦树苗", "丛林树苗", "金合欢树苗", "深色橡树树苗", "oak_sapling", "spruce_sapling", "birch_sapling", "jungle_sapling", "acacia_sapling", "dark_oak_sapling"], "weight": 1
+    },
+    {
+      "name": "小麦", "version": "远古", "type": "材料",
+      "tags": ["植物", "食物"], "world": "主世界",
+      "note": "种一片收一仓，面包和干草捆都靠它。",
+      "aliases": ["wheat"], "weight": 1
+    },
+    {
+      "name": "种子", "version": "远古", "type": "材料",
+      "tags": ["植物", "采集"], "world": "主世界",
+      "note": "小麦 / 南瓜 / 西瓜 / 甜菜的种子都算它。",
+      "aliases": ["小麦种子", "南瓜种子", "西瓜种子", "甜菜种子", "wheat_seeds", "pumpkin_seeds", "melon_seeds", "beetroot_seeds"], "weight": 1
+    },
+    {
+      "name": "蘑菇", "version": "远古", "type": "材料",
+      "tags": ["植物", "食物"], "world": "主世界",
+      "note": "红色蘑菇和棕色蘑菇都算它。",
+      "aliases": ["红色蘑菇", "棕色蘑菇", "red_mushroom", "brown_mushroom"], "weight": 1
+    },
+    {
+      "name": "郁金香", "version": "1.7", "type": "方块",
+      "tags": ["植物", "装饰"], "world": "主世界",
+      "note": "红 / 橙 / 白 / 粉四种郁金香都算它。",
+      "aliases": ["红色郁金香", "橙色郁金香", "白色郁金香", "粉红色郁金香", "tulip"], "weight": 1
+    },
+    {
+      "name": "矮草丛", "version": "远古", "type": "方块",
+      "tags": ["植物", "装饰"], "world": "主世界",
+      "note": "地上那种一格高的小草。",
+      "aliases": ["草", "short_grass", "grass"], "weight": 1
+    },
+    {
+      "name": "高草丛", "version": "远古", "type": "方块",
+      "tags": ["植物", "装饰"], "world": "主世界",
+      "note": "两格高的草，用剪刀能剪下来。",
+      "aliases": ["tall_grass"], "weight": 1
+    },
+    {
+      "name": "蕨", "version": "1.2", "type": "方块",
+      "tags": ["植物", "装饰"], "world": "主世界",
+      "note": "丛林和针叶林里那种蕨类。",
+      "aliases": ["fern"], "weight": 1
+    },
+    {
+      "name": "大型蕨", "version": "1.2", "type": "方块",
+      "tags": ["植物", "装饰"], "world": "主世界",
+      "note": "两格高的蕨。",
+      "aliases": ["large_fern"], "weight": 1
+    },
+    {
+      "name": "南瓜灯", "version": "远古", "type": "方块",
+      "tags": ["植物", "照明"], "world": "无",
+      "note": "南瓜掏空塞火把，会亮。",
+      "aliases": ["jack_o_lantern", "南瓜灯笼"], "weight": 1
+    },
+    {
+      "name": "雕刻南瓜", "version": "1.13", "type": "方块",
+      "tags": ["植物", "装饰"], "world": "主世界",
+      "note": "刻了脸的南瓜，能戴头上。",
+      "aliases": ["carved_pumpkin"], "weight": 1
+    },
+    {
+      "name": "睡莲", "version": "1.0", "type": "方块",
+      "tags": ["植物", "装饰"], "world": "主世界",
+      "note": "漂在水面上的圆叶子。",
+      "aliases": ["lily_pad"], "weight": 1
+    },
+    {
+      "name": "孢子花", "version": "1.17", "type": "方块",
+      "tags": ["植物", "装饰"], "world": "主世界",
+      "note": "繁茂洞穴顶上垂下来会掉孢子。",
+      "aliases": ["spore_blossom"], "weight": 1
+    },
+    {
+      "name": "书架", "version": "远古", "type": "方块",
+      "tags": ["木材", "装饰"], "world": "主世界",
+      "note": "六个木板三本书，附魔台的好邻居。",
+      "aliases": ["bookshelf"], "weight": 1
+    },
+    {
+      "name": "唱片机", "version": "远古", "type": "方块",
+      "tags": ["木材", "装饰"], "world": "主世界",
+      "note": "放音乐唱片的小机器。",
+      "aliases": ["jukebox"], "weight": 1
+    },
+    {
+      "name": "陷阱箱", "version": "1.0", "type": "方块",
+      "tags": ["木材", "存储", "红石"], "world": "无",
+      "note": "箱子加绊线钩，打开会发信号。",
+      "aliases": ["trapped_chest"], "weight": 1
+    },
+    {
+      "name": "红石火把", "version": "远古", "type": "方块",
+      "tags": ["红石", "照明"], "world": "无",
+      "note": "红石电路里的常亮电源。",
+      "aliases": ["redstone_torch"], "weight": 1
+    },
+    {
+      "name": "阳光探测器", "version": "1.8", "type": "方块",
+      "tags": ["红石", "照明"], "world": "无",
+      "note": "白天发信号，晚上不发。",
+      "aliases": ["daylight_detector", "日光传感器"], "weight": 1
+    },
+    {
+      "name": "绊线钩", "version": "1.3", "type": "方块",
+      "tags": ["木材", "红石"], "world": "无",
+      "note": "拉一根线，有人路过就发信号。",
+      "aliases": ["tripwire_hook"], "weight": 1
+    },
+    {
+      "name": "绊线", "version": "1.3", "type": "方块",
+      "tags": ["红石", "战斗"], "world": "无",
+      "note": "两个绊线钩之间拉的那根线。",
+      "aliases": ["tripwire"], "weight": 1
+    },
+    {
+      "name": "细雪桶", "version": "1.17", "type": "工具",
+      "tags": ["金属", "存储"], "world": "无",
+      "note": "装一桶细雪，倒出来能冻人。",
+      "aliases": ["powder_snow_bucket"], "weight": 1
+    },
+    {
+      "name": "诡异菌钓竿", "version": "1.16", "type": "工具",
+      "tags": ["木材", "交通"], "world": "无",
+      "note": "骑炽足兽专用。",
+      "aliases": ["warped_fungus_on_a_stick"], "weight": 1
+    },
+    {
+      "name": "蜜脾块", "version": "1.15", "type": "方块",
+      "tags": ["生物", "建筑"], "world": "无",
+      "note": "四个蜜脾压一块。",
+      "aliases": ["honeycomb_block"], "weight": 1
+    },
+    {
+      "name": "铁门", "version": "远古", "type": "方块",
+      "tags": ["金属", "建筑"], "world": "无",
+      "note": "铁锭做的门，只能用按钮或拉杆开。",
+      "aliases": ["iron_door"], "weight": 1
+    },
+    {
+      "name": "铁活板门", "version": "远古", "type": "方块",
+      "tags": ["金属", "建筑"], "world": "无",
+      "note": "铁做的活板门，手推不开。",
+      "aliases": ["iron_trapdoor"], "weight": 1
+    },
+    {
+      "name": "海绵", "version": "远古", "type": "方块",
+      "tags": ["稀有"], "world": "主世界",
+      "note": "海底神殿里那种能吸水的方块。",
+      "aliases": ["sponge"], "weight": 1
+    },
+    {
+      "name": "湿海绵", "version": "远古", "type": "方块",
+      "tags": ["稀有"], "world": "主世界",
+      "note": "吸饱水的海绵，烧一下又能用。",
+      "aliases": ["wet_sponge"], "weight": 1
+    },
+    {
+      "name": "雪", "version": "1.13", "type": "方块",
+      "tags": ["地形", "装饰"], "world": "主世界",
+      "note": "地上薄薄一层雪，能叠好几层。",
+      "aliases": ["snow", "雪层"], "weight": 1
+    },
+    {
+      "name": "TNT", "version": "远古", "type": "方块",
+      "tags": ["红石", "战斗"], "world": "无",
+      "note": "点火就炸，慎用。",
+      "aliases": ["tnt", "炸药"], "weight": 1
+    },
+    {
+      "name": "发光物品展示框", "version": "1.17", "type": "方块",
+      "tags": ["木材", "装饰"], "world": "无",
+      "note": "会发光的物品展示框。",
+      "aliases": ["glow_item_frame"], "weight": 1
+    },
+    {
+      "name": "金蒲公英", "version": "26.1", "type": "方块",
+      "tags": ["植物", "装饰", "稀有"], "world": "无",
+      "note": "蒲公英加八个金粒做的，给幼年动物用能冻住它的成长。",
+      "aliases": ["golden_dandelion"], "weight": 1
+    }
+  ]
+}

@@ -436,8 +436,10 @@ class Handler:
         return False
 
     async def _handle_mc_guess(self, command: str, event: Incoming) -> bool:
-        """「弗一把」：开局 / 状态 / 榜单 / 认输 / 猜词，规则全在 MCGuess.handle。
+        """「弗一把」：难度面板 / 开局 / 状态 / 榜单 / 认输 / 猜词。
 
+        发「弗一把」先回一块两个按钮的面板（简单 / 困难），点了才开局；
+        面板按钮的 data 就是「弗一把 简单模式」这种整句，点击和打字同一条路。
         返回 False 表示这条不关它事（没在对局里、也不是物品名），继续走规则和 AI。
         """
         for candidate in (
@@ -455,9 +457,8 @@ class Handler:
             if not result:
                 continue
             self._ensure_mc_ticker()
-            await self.sender.text(
-                event.group_openid, str(result.get("reply") or ""), event.msg_id
-            )
+            # 面板和纯文字都走这条：按钮只签给发命令的人，谁唤出谁点。
+            await self._deliver_panel(result, event, "弗一把")
             return True
         return False
 
@@ -1066,31 +1067,12 @@ class Handler:
                 await asyncio.sleep(0.6)
 
     async def _send_ai_reply(self, reply: str, event: Incoming) -> None:
-        """AI 的回复：先发文字，再按情况补一条语音条。
+        """AI 的回复只发文字，不再自动补语音条。
 
-        语音是锦上添花，所以文字一定先出去，念不出来也只丢语音。
-        QQCHATBOT_VOICE_AI=1 时每条都念；否则默认只念短回复
-        （≤ VOICE_AI_SHORT_CHARS 字，QQCHATBOT_VOICE_AI_SHORT 可关）。
+        语音条是独立命令：群友发「语音：…」才念。AI 回复自动念一遍既拖沓，
+        又多占一条被动回复，容易被平台限流。
         """
         await self.sender.text_long(event.group_openid, reply, event.msg_id)
-        text = reply.strip()
-        if not VOICE_ENABLED or not text:
-            return
-        if not VOICE_AI and not (
-            VOICE_AI_SHORT and len(text) <= VOICE_AI_SHORT_CHARS
-        ):
-            return
-        try:
-            path = await synthesize(text)
-        except VoiceError as error:
-            log(f"[语音] AI 回复念不出来，只留文字：{error}")
-            return
-        try:
-            await self.sender.voice(event.group_openid, path, event.msg_id)
-        except Exception as error:  # noqa: BLE001 - 发语音失败别把整条回复弄丢
-            log(f"[语音] 发语音失败，只留文字：{error!r}")
-        finally:
-            self._drop_rendered(path)
 
     @staticmethod
     def _drop_rendered(path) -> None:
