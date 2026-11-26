@@ -44,7 +44,9 @@ from .pet_sword import *  # noqa: F401,F403
 from .mc_guess import (
     MAX_ROUNDS,
     MCGuess,
+    RANK_FILE as MC_RANK_FILE,
     weighted_pick,
+    week_key,
     NUDGE_IDLE,
     SESSION_TTL,
 )
@@ -3329,6 +3331,17 @@ async def selftest() -> int:
            all(find_hard_item(name) is not None for name in
                ("去皮原木", "珊瑚", "幽匿感测体", "木棍", "TNT", "海绵",
                 "唱片机", "树苗", "小麦", "运输船")))
+    expect("合成字段与 wiki / 游戏配方一致",
+           "橡木木板" in find_hard_item("木棍").crafted_from
+           and "木棍" in find_hard_item("橡木木板").crafts_into
+           and "钻石" in find_hard_item("钻石剑").crafted_from
+           and find_hard_item("钻石剑").crafts_into == ()
+           and "干草捆" in find_hard_item("麦秆床").crafted_from
+           and "羊毛" in find_hard_item("羊毛楼梯").crafted_from)
+    expect("合成关系两边对得上",
+           all(item.name in find_hard_item(target).crafted_from
+               for item in MC_HARD_ITEMS for target in item.crafts_into
+               if find_hard_item(target) is not None))
     expect("按需求去掉的条目确实不在",
            all(find_hard_item(name) is None for name in
                ("珊瑚扇", "管珊瑚扇", "鱼桶", "鳕鱼桶", "靶标",
@@ -3523,6 +3536,31 @@ async def selftest() -> int:
     expect("榜单落盘、重启还在",
            fresh.leaderboard("G-MC")[0]["wins"] >= 2)
 
+    # ---- 榜单一周清一次：固定周四 0 点 ----
+    expect("周四 0 点是周期起点",
+           week_key(datetime.datetime(2026, 11, 30, 12).timestamp()) == "2026-11-26"
+           and week_key(datetime.datetime(2026, 12, 3, 0, 0, 1).timestamp())
+           == "2026-12-03")
+    week_dir = temporary / "mc-week"
+    week_dir.mkdir(parents=True, exist_ok=True)
+    clock = [datetime.datetime(2026, 11, 26, 9).timestamp()]      # 周四上午
+    weekly = MCGuess(handler.pets, week_dir, now=lambda: clock[0])
+    weekly.record_win("G-WK", "U-WK", "周四哥")
+    clock[0] += 3 * 86400.0                                       # 周日，还是这一期
+    expect("周四到周三算同一期",
+           weekly.record_win("G-WK", "U-WK", "周四哥")[0] == 2
+           and not weekly.needs_reset())
+    clock[0] = datetime.datetime(2026, 12, 3, 0, 0, 1).timestamp()  # 下个周四 0 点
+    expect("周四 0 点一到就换期", weekly.needs_reset())
+    expect("换期第一眼看榜就是空的", weekly.leaderboard("G-WK") == [])
+    expect("清空后新一期从 1 开始",
+           weekly.record_win("G-WK", "U-WK", "周四哥")[0] == 1)
+    clock[0] = datetime.datetime(2026, 12, 9, 23, 59).timestamp()   # 下周三深夜
+    expect("周三 23:59 还没到清零的点",
+           weekly.leaderboard("G-WK")[0]["wins"] == 1)
+    expect("榜文件里记着周期起点",
+           week_key(clock[0]) in (week_dir / MC_RANK_FILE).read_text(encoding="utf-8"))
+
     # 冷场提醒：把时钟往后拨，只改提醒计数
     # （后台催更任务是真定时器，自检里先停掉，免得半夜突然说话）
     early_ticker = getattr(handler, "_mc_ticker", None)
@@ -3610,6 +3648,12 @@ async def selftest() -> int:
            "第一个字是「矛」" not in handler.mc_guess._hint(_HintStub(16, one_char))
            and "最后一个字是「矛」" not in handler.mc_guess._hint(_HintStub(18, one_char))
            and "答案就一个字" in handler.mc_guess._hint(_HintStub(16, one_char)))
+    expect("第 12 轮提示能合成的东西、第 14 轮提示合成材料",
+           "它可以合成「" in handler.mc_guess._hint(_HintStub(12, find_hard_item("木棍")))
+           and "它的合成材料里有「" in handler.mc_guess._hint(_HintStub(14, find_hard_item("木棍"))))
+    expect("没有合成关系的题也有说法",
+           "没有再合成别的东西" in handler.mc_guess._hint(_HintStub(12, find_item("基岩")))
+           and "不是合成出来的" in handler.mc_guess._hint(_HintStub(14, find_item("基岩"))))
     expect("第 16 / 18 轮之外都不提示",
            all(handler.mc_guess._hint(_HintStub(rounds, one_char)) == ""
                for rounds in (0, 1, 15, 17, 19, 20)))

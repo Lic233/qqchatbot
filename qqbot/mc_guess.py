@@ -17,12 +17,15 @@
   别名自动补齐 16 色，所以猜「羊毛」和猜「红色羊毛」都算猜中。
 * 二十轮内猜中：猜中的人记一次胜场、进本群榜（纯粹比谁猜得准）；
   二十轮全用完还没中，就是大肥鱼难过那句话。
+* **榜单每 7 天清一次，固定在周四 0 点清零**（本周四到下周三是同一个榜），
+  榜里只算这一周的猜中次数；清空只动榜单，进行中的局不受影响。
 * 一局十分钟没人动就散场（下次发「弗一把」直接开新局，不会卡着）。
 
 会话只在内存里（和 ``cs.py`` 一样，重启就没了），不落任何文件。
 """
 from __future__ import annotations
 
+import datetime as _dt
 import time
 
 from .base import *  # noqa: F401,F403
@@ -76,6 +79,11 @@ MODE_BANKS = {
 # 榜单：按「猜中次数」排，落盘 data/mc_guess_rank.json（按群分开算）
 RANK_FILE = "mc_guess_rank.json"
 RANK_TOP = 3                    # 开局 / 状态里带的前三名（完整榜用「弗一把 榜单」）
+
+# 榜单周期：**每 7 天清一次，固定在周四 0 点**。周四到下一个周三是同一期，
+# 到下周四 0 点整自动清零（清空只动榜单，对局不受影响）。
+RESET_WEEKDAY = 3               # datetime.weekday()：周一 0 …… 周四 3
+RESET_LABEL = "每周四 0 点清零"
 
 # 冷场提醒：一个人猜对之后隔多久没人接话，就催一句（不占轮数、不改任何局内状态）
 NUDGE_IDLE = 180.0              # 三分钟没人动就催
@@ -188,11 +196,23 @@ def weighted_pick(items, rng):
     return rng.choices(items, weights=weights, k=1)[0]
 
 
+def week_key(ts: float) -> str:
+    """``ts`` 这一期的名字：最近一个周四的日期（``YYYY-MM-DD``，本地时间）。
+
+    周期是「周四 0 点 → 下周四 0 点前」，所以周四当天就算新一期；
+    零点一过这个字符串就跳到今天，跟榜里记的对不上，榜单随之清零。
+    """
+    moment = _dt.datetime.fromtimestamp(ts)
+    back = (moment.weekday() - RESET_WEEKDAY) % 7
+    return (moment.date() - _dt.timedelta(days=back)).isoformat()
+
+
 class MCGuess:
     """「弗一把」的会话管理 + 规则实现。
 
     对局只在内存里；**榜单**按群落盘到 ``data/mc_guess_rank.json``
-    （猜中一次记一次，重启也在）。冷场提醒只发一句文案，不碰任何局内状态。
+    （猜中一次记一次，重启也在；**每 7 天清一次，固定周四 0 点清零**）。
+    冷场提醒只发一句文案，不碰任何局内状态。
     """
 
     def __init__(self, pets, data_dir=None, rng=None, now=None) -> None:
@@ -202,11 +222,18 @@ class MCGuess:
         self.now = now or time.time
         self._games: dict[str, Game] = {}
         self.path = (Path(data_dir) / RANK_FILE) if data_dir else None
+        # 榜里的 period 是这一期的名字（起始那个周四的日期），对不上就清零
+        self._period = ""
         self._rank = self._load_rank()
 
     # ---- 榜单 ----
 
     def _load_rank(self) -> dict[str, dict[str, dict]]:
+        """读榜：新格式 ``{"period": "2026-11-26", "groups": {...}}``。
+
+        老文件（直接是 ``{群: {人: 记录}}``）照样能读，但里面没有周期信息，
+        第一次检查周期时会当成「上一期」直接清零。
+        """
         if self.path is None:
             return {}
         try:
@@ -215,6 +242,9 @@ class MCGuess:
             return {}
         if not isinstance(payload, dict):
             return {}
+        if isinstance(payload.get("groups"), dict):
+            self._period = str(payload.get("period") or "")
+            payload = payload["groups"]
         return {str(group): {str(user): entry for user, entry in board.items()
                              if isinstance(entry, dict)}
                 for group, board in payload.items() if isinstance(board, dict)}
@@ -223,14 +253,35 @@ class MCGuess:
         if self.path is None:
             return
         temporary = self.path.with_name("mc_guess_rank.tmp")
+        payload = {"period": self._period, "groups": self._rank}
         try:
             temporary.write_text(
-                json.dumps(self._rank, ensure_ascii=False, indent=2) + "\n",
+                json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
                 encoding="utf-8",
             )
             temporary.replace(self.path)
         except OSError as error:
             log(f"{FILE_LOG} 榜单保存失败：{error}")
+
+    def reset_week(self, force: bool = False) -> bool:
+        """到周四 0 点就把榜清空；返回这次到底清没清。
+
+        只在「看榜 / 记一次猜中」时顺手检查，机器人半夜关着也不会漏：
+        下次一读榜发现周期对不上，照样清。``force=True`` 立刻清（自检 / 手动用）。
+        """
+        if not force and not self.needs_reset():
+            return False
+        cleared = bool(self._rank)
+        self._rank = {}
+        self._period = week_key(self.now())
+        self._save_rank()
+        if cleared:
+            log(f"{FILE_LOG} 榜单清零（{RESET_LABEL}）")
+        return cleared
+
+    def needs_reset(self) -> bool:
+        """现在这一期跟榜里记的那期是不是同一个周四。"""
+        return week_key(self.now()) != self._period
 
     @staticmethod
     def _board_sorted(board: dict[str, dict]) -> list[tuple[str, dict]]:
@@ -242,7 +293,8 @@ class MCGuess:
         )
 
     def leaderboard(self, group: str, limit: int = 10) -> list[dict]:
-        """这个群的榜单：猜中次数从多到少。"""
+        """这个群的榜单：猜中次数从多到少（看之前先确认是不是还在同一周）。"""
+        self.reset_week()
         board = self._rank.get(str(group), {})
         rows = []
         for index, (user, entry) in enumerate(self._board_sorted(board)):
@@ -257,7 +309,8 @@ class MCGuess:
         return rows
 
     def record_win(self, group: str, user: str, name: str) -> tuple[int, int]:
-        """记一次猜中，返回（这个人累计猜中次数, 本群排名）。"""
+        """记一次猜中，返回（这个人本周猜中次数, 本群排名）。"""
+        self.reset_week()       # 跨过周四就先清零，新一期从这一把开始算
         board = self._rank.setdefault(str(group), {})
         entry = board.setdefault(str(user), {"name": name, "wins": 0, "last": 0})
         entry["name"] = (name or str(entry.get("name") or "群友")).strip()
@@ -279,9 +332,9 @@ class MCGuess:
     def board_text(self, group: str) -> str:
         rows = self.leaderboard(group, 10)
         if not rows:
-            return ("🏆 本群弗一把榜还空着喵。\n"
+            return (f"🏆 本群弗一把榜还空着喵（{RESET_LABEL}）。\n"
                     "发「弗一把」开一局，猜中一次就能上榜。")
-        lines = ["🏆 本群弗一把榜（按猜中次数）"]
+        lines = [f"🏆 本群弗一把榜（按猜中次数 · {RESET_LABEL}）"]
         lines += [f"{row['rank']}. {row['name']} — {row['wins']} 次" for row in rows]
         lines.append(f"共 {len(self._rank.get(str(group), {}))} 人上榜。")
         return "\n".join(lines)
@@ -378,7 +431,8 @@ class MCGuess:
             f"**{MODE_LABELS[MODE_EASY]}**：{MODE_BANKS[MODE_EASY]['scope']}，老题原样",
             f"**{MODE_LABELS[MODE_HARD]}**：{MODE_BANKS[MODE_HARD]['scope']}",
             "",
-            f"{MAX_ROUNDS} 轮全群共享 · 每猜一次给六维反馈 · 猜中记进本群榜",
+            f"{MAX_ROUNDS} 轮全群共享 · 每猜一次给六维反馈 · 猜中记进本群榜"
+            f"（{RESET_LABEL}）",
             "挑一个模式开局喵：",
         ]
         rows = [[(MODE_LABELS[MODE_EASY], MODE_DATA[MODE_EASY]),
@@ -567,14 +621,28 @@ class MCGuess:
     # ---- 文案 ----
 
     def _hint(self, game: Game) -> str:
-        """两次小提示：第 16 轮给名字第一个字，第 18 轮给最后一个字。
+        """四次小提示，按「已经猜了几轮」触发：
 
-        只按「已经猜了几轮」触发，不看剩几轮；夹在中间的第 17 / 19 / 20 轮
-        不提示。名字只有一个字时不点名（说了就等于公布答案），换成一句
-        「看看已猜里哪个最像它」。
+        * 第 12 轮：随机说一个「它能合成的东西」；
+        * 第 14 轮：随机说一个「合成它要用的材料」；
+        * 第 16 轮：名字的第一个字；第 18 轮：名字的最后一个字。
+
+        没有合成关系的题（矿石、生物……）直接说「没有再合成别的东西」/
+        「不是合成出来的」，也算有效信息。名字只有一个字时第 16 / 18 轮
+        不点名，换成「看看已猜里哪个最像它」。
         """
         rounds = game.rounds
         target = game.target
+        if rounds == 12:
+            if target.crafts_into:
+                pick = self.rng.choice(target.crafts_into)
+                return f"🔍 小提示：它可以合成「{pick}」。"
+            return "🔍 小提示：它没有再合成别的东西。"
+        if rounds == 14:
+            if target.crafted_from:
+                pick = self.rng.choice(target.crafted_from)
+                return f"🔍 小提示：它的合成材料里有「{pick}」。"
+            return "🔍 小提示：它不是合成出来的。"
         if rounds not in (16, 18):
             return ""
         if len(target.name) <= 1:
@@ -620,10 +688,10 @@ class MCGuess:
             f"第 {game.rounds}/{MAX_ROUNDS} 轮拿下（{guess.name} 猜中的）"
             f"{self._win_flavor(game)}",
             f"🐟 本局参与者：{shown}",
-            f"🏆 {guess.name} 第 {wins} 次猜中，本群第 {rank} 名",
+            f"🏆 {guess.name} 本周第 {wins} 次猜中，本群第 {rank} 名",
         ]
         log(f"{FILE_LOG} 猜中，{game.rounds} 轮，{len(players)} 人参与；"
-            f"{guess.name} 累计 {wins} 次")
+            f"{guess.name} 本周累计 {wins} 次")
         return "\n".join(lines)
 
     def _lose_text(self, game: Game, guess: Guess) -> str:
@@ -646,6 +714,6 @@ class MCGuess:
 # 题库本身的自检在 selftest 里也用得到
 __all__ = [
     "Game", "Guess", "MAX_ROUNDS", "MCGuess", "MODE_EASY", "MODE_HARD",
-    "MODE_LABELS", "SESSION_TTL",
-    "check_data", "ITEMS",
+    "MODE_LABELS", "RESET_LABEL", "RESET_WEEKDAY", "SESSION_TTL",
+    "check_data", "ITEMS", "week_key",
 ]

@@ -125,7 +125,24 @@ def check_hard_data() -> list[str]:
     ``check_data`` 会把名字 / 别名撞车、版本档位、类型标签一起查掉，
     所以这里直接复用，不另写一套。
     """
-    return check_data(HARD_ITEMS, VERSION_ORDER_HARD)
+    problems = check_data(HARD_ITEMS, VERSION_ORDER_HARD)
+    by_name = {item.name: item for item in HARD_ITEMS}
+    for item in HARD_ITEMS:
+        for target in item.crafts_into:
+            other = by_name.get(target)
+            if other is None:
+                problems.append(f"「{item.name}」的 crafts_into 指向不存在的条目：{target}")
+            elif item.name not in other.crafted_from:
+                problems.append(f"合成关系不对称：「{item.name}」能合成「{target}」，"
+                                f"但「{target}」的 crafted_from 里没有它")
+        for source in item.crafted_from:
+            other = by_name.get(source)
+            if other is None:
+                problems.append(f"「{item.name}」的 crafted_from 指向不存在的条目：{source}")
+            elif item.name not in other.crafts_into:
+                problems.append(f"合成关系不对称：「{item.name}」的材料里有「{source}」，"
+                                f"但「{source}」的 crafts_into 里没有它")
+    return problems
 
 
 __all__ = [

@@ -15,7 +15,8 @@ JSON 结构：
         {"name": "泥土", "version": "远古", "type": "方块",
          "tags": ["地形", "建筑"], "world": "主世界",
          "note": "徒手就能挖，到处都是，还能种地。",
-         "aliases": ["dirt"], "colored": false, "weight": 1}
+         "aliases": ["dirt"], "colored": false, "weight": 1,
+         "crafted_from": [], "crafts_into": ["草方块", ...]}
       ]
     }
 
@@ -27,7 +28,9 @@ JSON 结构：
 * ``colored: true`` 表示这条有 16 种颜色（羊毛 / 陶瓦……），16 色别名由
   ``colors`` 自动补齐，不用一条条写 —— 猜「羊毛」和猜「红色羊毛」都算它；
 * ``weight`` 是抽题权重，默认 1，必须是正数：写 3 就是权重 1 的三倍概率
-  （概率 = 本题权重 ÷ 全库权重和），全库都写 1 就是均匀抽。
+  （概率 = 本题权重 ÷ 全库权重和），全库都写 1 就是均匀抽；
+* ``crafted_from`` / ``crafts_into`` 是合成关系（材料 / 产物），写题库里的名字，
+  两边必须互为镜像（自检会查），第 12 / 14 轮的提示就从这里抽。
 """
 from __future__ import annotations
 
@@ -41,7 +44,7 @@ BANK_FILE = "mc_guess_easy.json"
 # 一条题目允许出现的字段：多写一个（比如把 tags 拼成 tag）会当场报错，
 # 免得改完静悄悄地不生效。
 ITEM_KEYS = {"name", "version", "type", "tags", "world", "note",
-             "aliases", "colored", "weight"}
+             "aliases", "colored", "weight", "crafted_from", "crafts_into"}
 
 
 @dataclass(frozen=True)
@@ -55,8 +58,11 @@ class Item:
     aliases: tuple[str, ...] = field(default_factory=tuple)
     # 这个物品有 16 种颜色（羊毛 / 陶瓦……），别名里已经带上「红色羊毛」这类写法
     colored: bool = False
-    # 抽题权重：越大越容易被抽到（权重 3 就是权重 1 的三倍概率），当前全库都是 1
+    # 抽题权重：越大越容易被抽到（权重 3 就是权重 1 的三倍概率）
     weight: float = 1.0
+    # 合成关系：crafted_from = 合成它要用的材料，crafts_into = 它能合成的东西
+    crafted_from: tuple[str, ...] = field(default_factory=tuple)
+    crafts_into: tuple[str, ...] = field(default_factory=tuple)
 
     @property
     def chars(self) -> int:
@@ -124,13 +130,23 @@ def _build_item(record, index: int, path, colors: tuple[str, ...]) -> Item:
     colored = bool(record.get("colored", False))
     if colored:
         aliases = aliases + [f"{color}{name}" for color in colors]
+    def name_list(key: str) -> list[str]:
+        value = record.get(key, [])
+        if not isinstance(value, list) or not all(isinstance(v, str)
+                                                  for v in value):
+            raise RuntimeError(f"{where}（{name}）的 {key} 必须是字符串数组")
+        return value
+
+    crafted_from = name_list("crafted_from")
+    crafts_into = name_list("crafts_into")
     weight = record.get("weight", 1)
     if isinstance(weight, bool) or not isinstance(weight, (int, float)) \
             or weight <= 0:
         raise RuntimeError(f"{where}（{name}）的 weight 必须是大于 0 的数字")
     return Item(name=name, version=record["version"], type=record["type"],
                 tags=tuple(tags), world=record["world"], note=note,
-                aliases=tuple(aliases), colored=colored, weight=float(weight))
+                aliases=tuple(aliases), colored=colored, weight=float(weight),
+                crafted_from=tuple(crafted_from), crafts_into=tuple(crafts_into))
 
 
 def load_items(path, colors: tuple[str, ...],
