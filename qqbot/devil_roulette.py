@@ -59,6 +59,7 @@ from .devil_roulette_data import (
     HURT_LINES,
     ITEMS,
     ITEM_ORDER,
+    ITEM_SHORT,
     MAX_HP,
     MAX_ITEMS,
     MODE_NAMES,
@@ -385,15 +386,15 @@ class DevilRoulette:
 
     def board_text(self, group: str, limit: int = 10) -> str:
         rows = self.leaderboard(group, limit)
-        header = "🏆 本群恶魔轮盘赌榜（按胜场排）"
+        header = "本群恶魔轮盘榜"
         if not rows:
             return (header + "\n还空着喵，赢一局就能上榜。\n"
                     "发「恶魔轮盘赌」开一桌吧。")
         lines = [header]
         for row in rows:
-            line = f"{row['rank']}. {row['name']} — {row['wins']} 胜 {row['losses']} 负"
+            line = f"{row['rank']}.{row['name']} {row['wins']}胜{row['losses']}负"
             if row["best"] >= 2:
-                line += f"（最长 {row['best']} 连胜）"
+                line += f" · {row['best']}连"
             lines.append(line)
         lines.append(f"共 {len(self._rank.get(str(group), {}))} 人上榜。")
         return "\n".join(lines)
@@ -401,8 +402,8 @@ class DevilRoulette:
     def _board_line(self, group: str, limit: int = RANK_TOP) -> str:
         rows = self.leaderboard(group, limit)
         if not rows:
-            return "🏆 本群榜还空着，赢一局就是榜首喵。"
-        return "🏆 本群榜：" + "　".join(
+            return "本群榜还空着，赢一局就是榜首喵。"
+        return "本群榜：" + "　".join(
             f"{row['rank']}.{row['name']} {row['wins']}胜" for row in rows
         )
 
@@ -629,19 +630,19 @@ class DevilRoulette:
         state.seq += 1
         gid, seq = state.panel_id, state.seq
         game = self.active(group)
+        balance = self.balance_of(user)
+        fee = (f"入场 {ENTRY_FEE}（道具 赢{self._refund('道具', True)}/输0 · "
+               f"纯赌 赢{self._refund('纯赌', True)}/退{self._refund('纯赌', False)}）")
+        if balance is not None:
+            fee += f" · 你有 {balance}"
         lines = [
             "# 🔫 恶魔轮盘赌",
             self._board_line(group),
-            "",
-            f"**{MAX_HP} 点电** · 实弹 −1 · **打自己空包不交枪**",
-            (f"💰 入场 {ENTRY_FEE} 银币：道具赢 {self._refund('道具', True)} / 输全赔 · "
-             f"纯赌赢 {self._refund('纯赌', True)} / 输退 {self._refund('纯赌', False)}"),
+            f"{MAX_HP} 电 · 实弹 −1 · 空包打自己不交枪",
+            fee,
         ]
-        balance = self.balance_of(user)
-        if balance is not None:
-            lines.append(f"你的银币：{balance}")
         if game is not None:
-            lines.append("⚠️ 这个群有一桌在打了，等他们打完喵。")
+            lines.append("这个群有一桌在打了，等他们打完喵。")
         rows = [
             [("单人·道具", panel_data(gid, seq, ACT_SOLO, "道具")),
              ("单人·纯赌", panel_data(gid, seq, ACT_SOLO, "纯赌"))],
@@ -669,10 +670,7 @@ class DevilRoulette:
         if action == ACT_RULE:
             return self._rules_reply()
         if action == ACT_DIRECT:
-            return self._reply(
-                "想跟谁打，就发一句「恶魔轮盘赌 @对方」喵 —— "
-                "对方的手机会弹出一张挑战帖，点接受就开局。"
-            )
+            return self._reply("想跟谁打就发「恶魔轮盘赌 @对方」，对方点接受就开局。")
         if action == ACT_SOLO:
             return self._start_solo(group, user, name, argument)
         if action == ACT_OPEN:
@@ -749,7 +747,7 @@ class DevilRoulette:
             ]
             allowed = [invite.target]
         else:
-            title = f"# ⚔️ {invite.challenger_name} 摆了一桌，谁来对赌？"
+            title = f"# 🎲 {invite.challenger_name} 摆了一桌，谁来对赌？"
             who = f"除了 {invite.challenger_name}，谁先点谁就是对手喵"
             rows = [
                 [("接受·道具", panel_data(iid, seq, ACT_ACCEPT, "道具")),
@@ -758,10 +756,9 @@ class DevilRoulette:
             allowed = []
         lines = [
             title,
-            f"{MAX_HP} 点电 · 入场 {ENTRY_FEE} 银币（两边各交各的）",
-            f"道具：赢返 {self._refund('道具', True)} / 输全赔 · "
-            f"纯赌：赢返 {self._refund('纯赌', True)} / 输退 {self._refund('纯赌', False)}",
-            f"{who} · {int(INVITE_TTL)} 秒有效",
+            f"{MAX_HP} 电 · 各交 {ENTRY_FEE}：道具 赢{self._refund('道具', True)}/输0 · "
+            f"纯赌 赢{self._refund('纯赌', True)}/退{self._refund('纯赌', False)}",
+            f"{who} · {int(INVITE_TTL)} 秒内有效",
         ]
         return {"text": "\n".join(lines), "rows": rows, "user_ids": allowed}
 
@@ -978,53 +975,53 @@ class DevilRoulette:
         if item == "放大镜":
             value = game.shells[game.idx]
             game.revealed[game.idx] = value
-            self._say(game, f"🔍 这一发是【{'实弹' if value else '空包'}】", source)
+            self._say(game, f"这一发是【{'实弹' if value else '空包'}】", source)
         elif item == "香烟":
             before = player.hp
             player.hp = min(MAX_HP, player.hp + 1)
-            self._say(game, f"🚬 {player.name} +{player.hp - before} → {player.hp}/{MAX_HP}",
+            self._say(game, f"{player.name} +{player.hp - before} → {player.hp}/{MAX_HP}",
                       source)
         elif item == "啤酒":
             value = game.shells[game.idx]
             game.idx += 1
             game.revealed[game.idx - 1] = value
-            self._say(game, f"🍺 退出一发【{'实弹' if value else '空包'}】", source)
+            self._say(game, f"退出一发【{'实弹' if value else '空包'}】", source)
         elif item == "手锯":
             player.saw = True
-            self._say(game, f"🪚 {player.name} 下一枪 ×2", source)
+            self._say(game, f"{player.name} 下一枪 ×2", source)
         elif item == "手铐":
             game.other.cuffed = True
-            self._say(game, f"⛓️ {player.name} 锁住对方", source)
+            self._say(game, f"{player.name} 锁住对方", source)
         elif item == "逆变器":
             game.shells[game.idx] = not game.shells[game.idx]
             if game.idx in game.revealed:
                 game.revealed[game.idx] = game.shells[game.idx]
-            self._say(game, "🔄 当前这发反转", source)
+            self._say(game, "当前这发反转", source)
         elif item == "电话":
             left = len(game.shells) - game.idx
             offset = self.rng.randrange(left)
             position = game.idx + offset
             value = game.shells[position]
             game.revealed[position] = value
-            self._say(game, f"☎️ 第 {offset + 1} 发是【{'实弹' if value else '空包'}】",
+            self._say(game, f"第 {offset + 1} 发是【{'实弹' if value else '空包'}】",
                       source)
         elif item == "药丸":
             if self.rng.random() < 0.5:
                 before = player.hp
                 player.hp = min(MAX_HP, player.hp + 2)
-                self._say(game, f"💊 好运 +{player.hp - before} → {player.hp}/{MAX_HP}",
+                self._say(game, f"好运 +{player.hp - before} → {player.hp}/{MAX_HP}",
                           source)
             else:
                 player.hp -= 1
-                self._say(game, f"💊 坏的 −1 → {max(player.hp, 0)}/{MAX_HP}", source)
+                self._say(game, f"坏的 −1 → {max(player.hp, 0)}/{MAX_HP}", source)
         elif item == "肾上腺素":
             stolen = self.rng.choice(game.other.items)
             game.other.items.remove(stolen)
             if len(player.items) < MAX_ITEMS:
                 player.items.append(stolen)
-                self._say(game, f"💉 {player.name} 抢到「{stolen}」", source)
+                self._say(game, f"{player.name} 抢到「{stolen}」", source)
             else:
-                self._say(game, f"💉 抢到「{stolen}」，手牌满，丢了", source)
+                self._say(game, f"抢到「{stolen}」，手牌满，丢了", source)
 
         if player.hp <= 0:
             self._finish(game, self._foe_of(game, player), forfeit=False,
@@ -1176,18 +1173,18 @@ class DevilRoulette:
         game.seq += 1
         gid, seq = game.gid, game.seq
         lines = [
-            f"# 🏁 恶魔轮盘赌 · {MODE_NAMES.get(game.mode, game.mode)}",
+            f"# 🏁 恶魔轮盘 · {game.mode}",
             f"🎉 {game.end_flavor}",
         ]
+        # 战绩和钱包合成一行：一个人一行，双人局也才两行
+        wallet = {name: (paid, refund) for name, paid, refund in game.refunds}
         for name, stats in game.end_records:
-            lines.append(f"🏆 {name} {stats['wins']}胜{stats['losses']}负"
-                         f" · 本群第 {stats['rank']}")
-        for name, paid, refund in game.refunds:
-            net = refund - paid
-            sign = f"+{net}" if net >= 0 else str(net)
-            lines.append(f"💰 {name} 入场 {paid} → 返 {refund}（{sign}）")
+            line = f"{name} {stats['wins']}胜{stats['losses']}负 · 本群第{stats['rank']}"
+            paid, refund = wallet.get(name, (0, 0))
+            if paid:
+                line += f" · 入场{paid} 返{refund}（{refund - paid:+d}）"
+            lines.append(line)
         if game.end_fish:
-            lines.append("***")
             lines.append(f"> 🐟 {game.end_fish}")
         rows = [
             [("再来一局", panel_data(gid, seq, ACT_REMATCH))],
@@ -1234,15 +1231,15 @@ class DevilRoulette:
     def _rack_line(self, game: Game) -> str:
         left = len(game.shells) - game.idx
         live = self._count_live(game)
-        return f"弹匣 {left} · 实 {live} 空 {left - live} · 第 {game.round} 轮"
+        return f"弹匣{left} 实{live}空{left - live} 第{game.round}轮"
 
     def _turn_line(self, game: Game) -> str:
         player = game.current
         if player.ai:
             return "🐟 装弹中…"
         if game.solo:
-            return "🎯 你的回合"
-        return f"🎯 {player.name} 的回合"
+            return "🎯 你"
+        return f"🎯 {player.name}"
 
     def _items_line(self, game: Game) -> str:
         if game.mode != "道具":
@@ -1260,22 +1257,27 @@ class DevilRoulette:
         return " ".join(parts)
 
     def _game_text(self, game: Game) -> str:
+        """对局面板正文：标题 + 电量 + 一行状态 + 一行播报 + 一句狠话。
+
+        每条消息都会被顶到群聊最下面，所以这里能压就压：弹匣 / 回合 / 手牌
+        挤成一行，玩家和大肥鱼上一手也挤成一行，不带空行和小标题。
+        """
         lines = [
-            f"# 🔫 恶魔轮盘赌 · {MODE_NAMES.get(game.mode, game.mode)}",
+            f"# 🔫 恶魔轮盘 · {game.mode}",
             self._score_line(game),
-            self._rack_line(game),
+            " · ".join(part for part in (
+                self._rack_line(game),
+                self._turn_line(game),
+                self._items_line(game),
+            ) if part),
         ]
-        turn = self._turn_line(game)
-        items = self._items_line(game)
-        lines.append(f"{turn} · {items}" if items else turn)
-        # 只留「你的上一手 + 大肥鱼上一手 + 一句小播报」，多余的过程不往面板上糊
-        notes = [note for note in (game.human_note, game.ai_note, game.sys_note) if note]
+        # 只留「你的上一手 + 大肥鱼上一手 + 一句小播报」，合成一行
+        notes = [note for note in (game.human_note, game.ai_note, game.sys_note)
+                 if note]
         if notes:
-            lines.append("")
-            lines.extend(notes)
-        # 大肥鱼的话单独隔开、走引用块（客户端会缩成小字灰底）
+            lines.append("　".join(notes))
+        # 大肥鱼的话单独走引用块（客户端会缩成小字灰底），前面不留分隔线
         if game.taunt:
-            lines.append("***")
             lines.append(f"> 🐟 {game.taunt}")
         return "\n".join(lines)
 
@@ -1323,26 +1325,22 @@ class DevilRoulette:
 
     @staticmethod
     def _rules_reply() -> dict:
+        """玩法说明：一屏看完，九件道具挤成三行。"""
+        refund = DevilRoulette._refund
         lines = [
-            "# 🔫 恶魔轮盘赌 · 玩法",
-            f"双方各 **{MAX_HP} 点电**，谁先掉到 0 谁输（一局打到见底才结算）。",
-            "· 打自己空包：不扣电，**枪还归你**",
+            "# 恶魔轮盘赌 · 玩法",
+            f"双方 {MAX_HP} 电，打光对方就赢。",
+            "· 打自己空包：不扣电，枪还归你",
             "· 打自己实弹：自己 −1，交枪",
-            "· 打对方：实弹对方 −1，空包没事；两种都交枪",
-            "· 弹匣打空只是补一轮新弹（每轮每人补 2 件道具），**血量不回满**",
-            "",
-            f"💰 入场 {ENTRY_FEE} 银币：道具赢返 {DevilRoulette._refund('道具', True)}、"
-            f"输全赔；纯赌赢返 {DevilRoulette._refund('纯赌', True)}、"
-            f"输退 {DevilRoulette._refund('纯赌', False)}。超时散桌原路全退。",
-            "",
-            "🃏 道具（每轮发 2 件，上限 8）：",
+            "· 打对方：实弹 −1，交枪",
+            f"弹匣打空换新弹（每人补 {DEAL_PER_ROUND} 件，上限 {MAX_ITEMS}），血量不回满。",
+            f"入场 {ENTRY_FEE}：道具 赢返{refund('道具', True)}/输全赔 · "
+            f"纯赌 赢返{refund('纯赌', True)}/输退{refund('纯赌', False)} · 超时全退",
         ]
-        for name in ITEM_ORDER:
-            item = ITEMS[name]
-            lines.append(f"{item.emoji} {item.name}：{item.desc}")
-        lines.append("")
-        lines.append("🎲 纯赌：没有道具，全看弹匣和胆子。")
-        lines.append("💡 没有私聊，放大镜 / 电话的情报全群可见，双人局当公开牌打。")
+        cells = [f"{ITEMS[name].emoji}{name} {ITEM_SHORT[name]}" for name in ITEM_ORDER]
+        for index in range(0, len(cells), 3):
+            lines.append(" · ".join(cells[index:index + 3]))
+        lines.append("纯赌没有道具；情报全群可见，双人局当公开牌打。")
         return {"reply": "\n".join(lines)}
 
     # ==================================================================

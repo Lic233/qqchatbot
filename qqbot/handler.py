@@ -1195,7 +1195,7 @@ class Handler:
         if command == "打卡":
             count = self.attendance.record(group, user)
             await self.sender.text(
-                group, f"就这点？才打卡{count}次啊，明天继续。", event.msg_id
+                group, f"就这点？才打卡{count}次啊，杂鱼！", event.msg_id
             )
             return
 

@@ -3329,8 +3329,13 @@ async def selftest() -> int:
     expect("JSON 写错字段名会当场报错", bad_json_ok)
     expect("之前漏收的老东西也补进来了",
            all(find_hard_item(name) is not None for name in
-               ("去皮原木", "珊瑚", "幽匿感测体", "木棍", "TNT", "海绵",
-                "唱片机", "树苗", "小麦", "运输船")))
+               ("去皮橡木原木", "管珊瑚", "幽匿感测体", "木棍", "TNT", "海绵",
+                "唱片机", "橡树树苗", "小麦", "橡木运输船")))
+    expect("四种郁金香并成一条「郁金香」",
+           all(find_hard_item(name).name == "郁金香"
+               for name in ("红色郁金香", "橙色郁金香", "白色郁金香",
+                            "粉红色郁金香"))
+           and find_hard_item("郁金香") is not None)
     expect("合成字段与 wiki / 游戏配方一致",
            "橡木木板" in find_hard_item("木棍").crafted_from
            and "木棍" in find_hard_item("橡木木板").crafts_into
@@ -3346,13 +3351,17 @@ async def selftest() -> int:
            all(find_hard_item(name) is None for name in
                ("珊瑚扇", "管珊瑚扇", "鱼桶", "鳕鱼桶", "靶标",
                 "绯红菌索", "诡异菌索", "缠怨藤", "垂泪藤"))
-           and find_hard_item("珊瑚") is not None)
-    expect("补漏的系列按一个名字收",
-           find_hard_item("去皮樱花原木").name == "去皮原木"
-           and find_hard_item("管珊瑚").name == "珊瑚"
-           and find_hard_item("橡树树苗").name == "树苗"
-           and find_hard_item("小麦种子").name == "种子"
-           and find_hard_item("红色蘑菇").name == "蘑菇")
+           and find_hard_item("管珊瑚") is not None)
+    expect("合并过的族系已经拆回独立条目",
+           find_hard_item("去皮樱花原木").name == "去皮樱花原木"
+           and find_hard_item("红树木运输船").name == "红树木运输船"
+           and find_hard_item("橡树树苗").name == "橡树树苗"
+           and find_hard_item("小麦种子").name == "小麦种子"
+           and find_hard_item("红色蘑菇").name == "红色蘑菇"
+           and find_hard_item("白色郁金香").name == "郁金香"
+           and find_hard_item("管珊瑚").name == "管珊瑚"
+           and find_hard_item("橡木").name == "橡木"
+           and find_hard_item("去皮深色橡木").name == "去皮深色橡木")
 
     # ---- 六维比对 ----
     mc_target = find_item("下界合金剑")
@@ -3882,7 +3891,9 @@ async def selftest() -> int:
     expect("标题用一号标题、正文分层", text.startswith("# "))
     expect("大肥鱼的话单独隔开成引用块",
            "\n> 🐟 哼，你的手在抖吧？" in text)
-    expect("对局面板正文不超过 10 行", len(text.splitlines()) <= 10)
+    expect("对局面板正文不超过 6 行（一枪一条，越短越好）",
+           len(text.splitlines()) <= 6)
+    expect("对局面板正文不超过 160 字", len(text) <= 160)
 
     # ---- 入场费：扣费 / 赢了按倍率返 / 输了按模式退 ----
     devil.clear()
@@ -3989,7 +4000,7 @@ async def selftest() -> int:
     expect("朝自己开枪把自己电死：是自己输，不是自己赢",
            self_game.over and self_game.winner == FISH_NAME)
     expect("自尽按输结算（道具模式入场费全赔）",
-           "入场 100 → 返 0" in dr_reply(suicide))
+           "入场100 返0" in dr_reply(suicide))
 
     # ---- 双人对赌：定向挑战 ----
     devil.clear()
@@ -4042,8 +4053,8 @@ async def selftest() -> int:
     expect("双人局里把自己电死的人算输",
            kill_game.over and kill_game.winner == "阿伟")
     expect("双人结算排名：赢家第 1、自尽的人第 2",
-           "阿伟 1胜0负 · 本群第 1" in dr_reply(kill_result)
-           and "庞月 0胜1负 · 本群第 2" in dr_reply(kill_result))
+           "阿伟 1胜0负 · 本群第1" in dr_reply(kill_result)
+           and "庞月 0胜1负 · 本群第2" in dr_reply(kill_result))
 
     # ---- 双人对赌：拒绝 / 公开挑战 / 一桌一座 ----
     devil.clear()

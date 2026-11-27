@@ -72,7 +72,7 @@ MODE_BANKS = {
         "order": VERSION_ORDER_HARD,
         "find": find_hard_item,
         "check": check_hard_data,
-        "scope": "26.3 及以前的全部物品和生物（1.21.x 和 26.x 的新内容都在里面）",
+        "scope": "26.3 及以前的全部物品和生物",
     },
 }
 
@@ -428,7 +428,7 @@ class MCGuess:
             "# 🎮 弗一把 · Minecraft 物品 & 生物",
             self._board_line(group),
             "",
-            f"**{MODE_LABELS[MODE_EASY]}**：{MODE_BANKS[MODE_EASY]['scope']}，老题原样",
+            f"**{MODE_LABELS[MODE_EASY]}**：{MODE_BANKS[MODE_EASY]['scope']}",
             f"**{MODE_LABELS[MODE_HARD]}**：{MODE_BANKS[MODE_HARD]['scope']}",
             "",
             f"{MAX_ROUNDS} 轮全群共享 · 每猜一次给六维反馈 · 猜中记进本群榜"

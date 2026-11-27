@@ -484,56 +484,56 @@
       "tags": ["木材", "建筑"], "world": "主世界",
       "note": "第一天的第一棵树。",
       "aliases": ["oak_log"], "weight": 1,
-      "crafted_from": [], "crafts_into": ["木头", "橡木木板", "灵魂营火", "烟熏炉", "营火"]
+      "crafted_from": [], "crafts_into": ["橡木", "橡木木板", "灵魂营火", "烟熏炉", "营火"]
     },
     {
       "name": "云杉原木", "version": "远古", "type": "方块",
       "tags": ["木材", "建筑"], "world": "主世界",
       "note": "雪原上那种深色的树。",
       "aliases": ["spruce_log"], "weight": 1,
-      "crafted_from": [], "crafts_into": ["云杉木板", "木头", "灵魂营火", "烟熏炉", "营火"]
+      "crafted_from": [], "crafts_into": ["云杉木", "云杉木板", "灵魂营火", "烟熏炉", "营火"]
     },
     {
       "name": "白桦原木", "version": "远古", "type": "方块",
       "tags": ["木材", "建筑"], "world": "主世界",
       "note": "白皮黑斑的树。",
       "aliases": ["birch_log"], "weight": 1,
-      "crafted_from": [], "crafts_into": ["木头", "灵魂营火", "烟熏炉", "白桦木板", "营火"]
+      "crafted_from": [], "crafts_into": ["灵魂营火", "烟熏炉", "白桦木", "白桦木板", "营火"]
     },
     {
       "name": "丛林原木", "version": "1.2", "type": "方块",
       "tags": ["木材", "建筑"], "world": "主世界",
       "note": "热带雨林里又高又粗的树。",
       "aliases": ["jungle_log"], "weight": 1,
-      "crafted_from": [], "crafts_into": ["丛林木板", "木头", "灵魂营火", "烟熏炉", "营火"]
+      "crafted_from": [], "crafts_into": ["丛林木", "丛林木板", "灵魂营火", "烟熏炉", "营火"]
     },
     {
       "name": "金合欢原木", "version": "1.7", "type": "方块",
       "tags": ["木材", "建筑"], "world": "主世界",
       "note": "恶地那种橙色的树。",
       "aliases": ["acacia_log"], "weight": 1,
-      "crafted_from": [], "crafts_into": ["木头", "灵魂营火", "烟熏炉", "营火", "金合欢木板"]
+      "crafted_from": [], "crafts_into": ["灵魂营火", "烟熏炉", "营火", "金合欢木", "金合欢木板"]
     },
     {
       "name": "深色橡木原木", "version": "1.7", "type": "方块",
       "tags": ["木材", "建筑"], "world": "主世界",
       "note": "黑森林里粗壮的树。",
       "aliases": ["dark_oak_log"], "weight": 1,
-      "crafted_from": [], "crafts_into": ["木头", "深色橡木木板", "灵魂营火", "烟熏炉", "营火"]
+      "crafted_from": [], "crafts_into": ["深色橡木", "深色橡木木板", "灵魂营火", "烟熏炉", "营火"]
     },
     {
       "name": "红树原木", "version": "1.19", "type": "方块",
       "tags": ["木材", "建筑"], "world": "主世界",
       "note": "红树林沼泽里长出来的。",
       "aliases": ["mangrove_log"], "weight": 1,
-      "crafted_from": [], "crafts_into": ["木头", "灵魂营火", "烟熏炉", "红树木板", "营火"]
+      "crafted_from": [], "crafts_into": ["灵魂营火", "烟熏炉", "红树木", "红树木板", "营火"]
     },
     {
       "name": "樱花原木", "version": "1.20", "type": "方块",
       "tags": ["木材", "建筑"], "world": "主世界",
       "note": "樱花树林的浪漫，树苗还能种回去。",
       "aliases": ["cherry_log"], "weight": 1,
-      "crafted_from": [], "crafts_into": ["木头", "樱花木板", "灵魂营火", "烟熏炉", "营火"]
+      "crafted_from": [], "crafts_into": ["樱花木", "樱花木板", "灵魂营火", "烟熏炉", "营火"]
     },
     {
       "name": "绯红菌柄", "version": "1.16", "type": "方块",
@@ -659,7 +659,7 @@
       "tags": ["植物", "食物"], "world": "主世界",
       "note": "戴在头上能逗铁傀儡。",
       "aliases": ["pumpkin"], "weight": 1,
-      "crafted_from": [], "crafts_into": ["南瓜派", "种子"]
+      "crafted_from": [], "crafts_into": ["南瓜派", "南瓜种子"]
     },
     {
       "name": "西瓜", "version": "远古", "type": "方块",
@@ -960,7 +960,7 @@
       "tags": ["木材", "照明", "烹饪"], "world": "主世界",
       "note": "能烤肉，烟还能当路标。",
       "aliases": ["campfire"], "weight": 1,
-      "crafted_from": ["丛林原木", "云杉原木", "去皮原木", "去皮木头", "去皮绯红菌核", "去皮菌柄", "去皮诡异菌核", "木头", "木棍", "木炭", "樱花原木", "橡木原木", "深色橡木原木", "煤炭", "白桦原木", "红树原木", "绯红菌柄", "绯红菌核", "苍白橡木", "苍白橡木原木", "诡异菌柄", "诡异菌核", "金合欢原木"], "crafts_into": []
+      "crafted_from": ["丛林原木", "丛林木", "云杉原木", "云杉木", "去皮丛林木", "去皮云杉木", "去皮樱花原木", "去皮樱花木", "去皮橡木", "去皮橡木原木", "去皮深色橡木", "去皮深色橡木原木", "去皮白桦木", "去皮红树原木", "去皮红树木", "去皮绯红菌柄", "去皮绯红菌核", "去皮苍白橡木", "去皮苍白橡木原木", "去皮诡异菌柄", "去皮诡异菌核", "去皮金合欢木", "木棍", "木炭", "樱花原木", "樱花木", "橡木", "橡木原木", "深色橡木", "深色橡木原木", "煤炭", "白桦原木", "白桦木", "红树原木", "红树木", "绯红菌柄", "绯红菌核", "苍白橡木", "苍白橡木原木", "诡异菌柄", "诡异菌核", "金合欢原木", "金合欢木"], "crafts_into": []
     },
     {
       "name": "末地烛", "version": "1.9", "type": "方块",
@@ -1002,7 +1002,7 @@
       "tags": ["木材", "存储"], "world": "主世界",
       "note": "最基础的储物箱。",
       "aliases": ["chest"], "weight": 1,
-      "crafted_from": ["丛林木板", "云杉木板", "杨木木板", "樱花木板", "橡木木板", "深色橡木木板", "白桦木板", "竹板", "红树木板", "绯红木板", "苍白橡木木板", "诡异木板", "金合欢木板"], "crafts_into": ["漏斗", "潜影盒", "运输船", "铜箱子", "陷阱箱"]
+      "crafted_from": ["丛林木板", "云杉木板", "杨木木板", "樱花木板", "橡木木板", "深色橡木木板", "白桦木板", "竹板", "红树木板", "绯红木板", "苍白橡木木板", "诡异木板", "金合欢木板"], "crafts_into": ["丛林木运输船", "云杉木运输船", "樱花木运输船", "橡木运输船", "深色橡木运输船", "漏斗", "潜影盒", "白桦木运输船", "红树木运输船", "苍白橡木运输船", "运输竹筏", "金合欢木运输船", "铜箱子", "陷阱箱"]
     },
     {
       "name": "木桶", "version": "1.14", "type": "方块",
@@ -1030,7 +1030,7 @@
       "tags": ["石材", "烹饪"], "world": "主世界",
       "note": "烤肉专用，比熔炉快。",
       "aliases": ["smoker"], "weight": 1,
-      "crafted_from": ["丛林原木", "云杉原木", "去皮原木", "去皮木头", "去皮绯红菌核", "去皮菌柄", "去皮诡异菌核", "木头", "樱花原木", "橡木原木", "深色橡木原木", "熔炉", "白桦原木", "红树原木", "绯红菌柄", "绯红菌核", "苍白橡木", "苍白橡木原木", "诡异菌柄", "诡异菌核", "金合欢原木"], "crafts_into": []
+      "crafted_from": ["丛林原木", "丛林木", "云杉原木", "云杉木", "去皮丛林木", "去皮云杉木", "去皮樱花原木", "去皮樱花木", "去皮橡木", "去皮橡木原木", "去皮深色橡木", "去皮深色橡木原木", "去皮白桦木", "去皮红树原木", "去皮红树木", "去皮绯红菌柄", "去皮绯红菌核", "去皮苍白橡木", "去皮苍白橡木原木", "去皮诡异菌柄", "去皮诡异菌核", "去皮金合欢木", "樱花原木", "樱花木", "橡木", "橡木原木", "深色橡木", "深色橡木原木", "熔炉", "白桦原木", "白桦木", "红树原木", "红树木", "绯红菌柄", "绯红菌核", "苍白橡木", "苍白橡木原木", "诡异菌柄", "诡异菌核", "金合欢原木", "金合欢木"], "crafts_into": []
     },
     {
       "name": "工作台", "version": "远古", "type": "方块",
@@ -1779,14 +1779,14 @@
       "tags": ["植物", "食物", "烹饪"], "world": "无",
       "note": "碗里两朵蘑菇，吃完碗还能拿回来。",
       "aliases": ["mushroom_stew"], "weight": 1,
-      "crafted_from": ["层孔菇", "碗", "蘑菇"], "crafts_into": []
+      "crafted_from": ["层孔菇", "棕色蘑菇", "碗", "红色蘑菇"], "crafts_into": []
     },
     {
       "name": "兔肉煲", "version": "1.8", "type": "食物",
       "tags": ["生物", "食物", "烹饪"], "world": "无",
       "note": "兔肉加胡萝卜和蘑菇，一锅炖。",
       "aliases": ["rabbit_stew"], "weight": 1,
-      "crafted_from": ["烤马铃薯", "熟兔肉", "碗", "胡萝卜", "蘑菇"], "crafts_into": []
+      "crafted_from": ["棕色蘑菇", "烤马铃薯", "熟兔肉", "碗", "红色蘑菇", "胡萝卜"], "crafts_into": []
     },
     {
       "name": "牛排", "version": "远古", "type": "食物",
@@ -1919,7 +1919,7 @@
       "tags": ["植物", "食物"], "world": "无",
       "note": "西瓜敲出来的红瓤。",
       "aliases": ["melon_slice"], "weight": 1,
-      "crafted_from": [], "crafts_into": ["种子", "西瓜"]
+      "crafted_from": [], "crafts_into": ["西瓜", "西瓜种子"]
     },
     {
       "name": "海带干", "version": "1.13", "type": "食物",
@@ -2451,7 +2451,7 @@
       "tags": ["植物", "交通"], "world": "无",
       "note": "竹子做的船，划起来一样快。",
       "aliases": ["bamboo_raft"], "weight": 0.3,
-      "crafted_from": ["竹板"], "crafts_into": []
+      "crafted_from": ["竹板"], "crafts_into": ["运输竹筏"]
     },
     {
       "name": "地图", "version": "远古", "type": "工具",
@@ -3235,56 +3235,56 @@
       "tags": ["木材", "交通"], "world": "无",
       "note": "橡木做的船，过河、跑图都能用。",
       "aliases": [], "weight": 0.3,
-      "crafted_from": ["橡木木板"], "crafts_into": ["运输船"]
+      "crafted_from": ["橡木木板"], "crafts_into": ["橡木运输船"]
     },
     {
       "name": "云杉木船", "version": "远古", "type": "工具",
       "tags": ["木材", "交通"], "world": "无",
       "note": "云杉木做的船，过河、跑图都能用。",
       "aliases": [], "weight": 0.3,
-      "crafted_from": ["云杉木板"], "crafts_into": ["运输船"]
+      "crafted_from": ["云杉木板"], "crafts_into": ["云杉木运输船"]
     },
     {
       "name": "白桦木船", "version": "远古", "type": "工具",
       "tags": ["木材", "交通"], "world": "无",
       "note": "白桦木做的船，过河、跑图都能用。",
       "aliases": [], "weight": 0.3,
-      "crafted_from": ["白桦木板"], "crafts_into": ["运输船"]
+      "crafted_from": ["白桦木板"], "crafts_into": ["白桦木运输船"]
     },
     {
       "name": "丛林木船", "version": "1.2", "type": "工具",
       "tags": ["木材", "交通"], "world": "无",
       "note": "丛林木做的船，过河、跑图都能用。",
       "aliases": [], "weight": 0.3,
-      "crafted_from": ["丛林木板"], "crafts_into": []
+      "crafted_from": ["丛林木板"], "crafts_into": ["丛林木运输船"]
     },
     {
       "name": "金合欢木船", "version": "1.7", "type": "工具",
       "tags": ["木材", "交通"], "world": "无",
       "note": "金合欢木做的船，过河、跑图都能用。",
       "aliases": [], "weight": 0.3,
-      "crafted_from": ["金合欢木板"], "crafts_into": []
+      "crafted_from": ["金合欢木板"], "crafts_into": ["金合欢木运输船"]
     },
     {
       "name": "深色橡木船", "version": "1.7", "type": "工具",
       "tags": ["木材", "交通"], "world": "无",
       "note": "深色橡木做的船，过河、跑图都能用。",
       "aliases": [], "weight": 0.3,
-      "crafted_from": ["深色橡木木板"], "crafts_into": ["运输船"]
+      "crafted_from": ["深色橡木木板"], "crafts_into": ["深色橡木运输船"]
     },
     {
       "name": "红树木船", "version": "1.19", "type": "工具",
       "tags": ["木材", "交通"], "world": "无",
       "note": "红树木做的船，过河、跑图都能用。",
       "aliases": [], "weight": 0.3,
-      "crafted_from": ["红树木板"], "crafts_into": []
+      "crafted_from": ["红树木板"], "crafts_into": ["红树木运输船"]
     },
     {
       "name": "樱花木船", "version": "1.20", "type": "工具",
       "tags": ["木材", "交通"], "world": "无",
       "note": "樱花木做的船，过河、跑图都能用。",
       "aliases": [], "weight": 0.3,
-      "crafted_from": ["樱花木板"], "crafts_into": []
+      "crafted_from": ["樱花木板"], "crafts_into": ["樱花木运输船"]
     },
     {
       "name": "绯红木船", "version": "1.16", "type": "工具",
@@ -3305,56 +3305,56 @@
       "tags": ["木材", "装饰"], "world": "无",
       "note": "橡木做的悬挂告示牌，能挂在天花板上。",
       "aliases": [], "weight": 0.3,
-      "crafted_from": ["去皮原木", "锁链"], "crafts_into": []
+      "crafted_from": ["去皮橡木原木", "锁链"], "crafts_into": []
     },
     {
       "name": "悬挂式云杉木告示牌", "version": "1.20", "type": "方块",
       "tags": ["木材", "装饰"], "world": "无",
       "note": "云杉木做的悬挂告示牌，能挂在天花板上。",
       "aliases": [], "weight": 0.3,
-      "crafted_from": ["去皮原木", "锁链"], "crafts_into": []
+      "crafted_from": ["锁链"], "crafts_into": []
     },
     {
       "name": "悬挂式白桦木告示牌", "version": "1.20", "type": "方块",
       "tags": ["木材", "装饰"], "world": "无",
       "note": "白桦木做的悬挂告示牌，能挂在天花板上。",
       "aliases": [], "weight": 0.3,
-      "crafted_from": ["去皮原木", "锁链"], "crafts_into": []
+      "crafted_from": ["锁链"], "crafts_into": []
     },
     {
       "name": "悬挂式丛林木告示牌", "version": "1.20", "type": "方块",
       "tags": ["木材", "装饰"], "world": "无",
       "note": "丛林木做的悬挂告示牌，能挂在天花板上。",
       "aliases": [], "weight": 0.3,
-      "crafted_from": ["去皮原木", "锁链"], "crafts_into": []
+      "crafted_from": ["锁链"], "crafts_into": []
     },
     {
       "name": "悬挂式金合欢木告示牌", "version": "1.20", "type": "方块",
       "tags": ["木材", "装饰"], "world": "无",
       "note": "金合欢木做的悬挂告示牌，能挂在天花板上。",
       "aliases": [], "weight": 0.3,
-      "crafted_from": ["去皮原木", "锁链"], "crafts_into": []
+      "crafted_from": ["锁链"], "crafts_into": []
     },
     {
       "name": "悬挂式深色橡木告示牌", "version": "1.20", "type": "方块",
       "tags": ["木材", "装饰"], "world": "无",
       "note": "深色橡木做的悬挂告示牌，能挂在天花板上。",
       "aliases": [], "weight": 0.3,
-      "crafted_from": ["去皮原木", "锁链"], "crafts_into": []
+      "crafted_from": ["去皮深色橡木原木", "锁链"], "crafts_into": []
     },
     {
       "name": "悬挂式红树木告示牌", "version": "1.20", "type": "方块",
       "tags": ["木材", "装饰"], "world": "无",
       "note": "红树木做的悬挂告示牌，能挂在天花板上。",
       "aliases": [], "weight": 0.3,
-      "crafted_from": ["去皮原木", "锁链"], "crafts_into": []
+      "crafted_from": ["去皮红树原木", "锁链"], "crafts_into": []
     },
     {
       "name": "悬挂式樱花木告示牌", "version": "1.20", "type": "方块",
       "tags": ["木材", "装饰"], "world": "无",
       "note": "樱花木做的悬挂告示牌，能挂在天花板上。",
       "aliases": [], "weight": 0.3,
-      "crafted_from": ["去皮原木", "锁链"], "crafts_into": []
+      "crafted_from": ["去皮樱花原木", "锁链"], "crafts_into": []
     },
     {
       "name": "悬挂式竹告示牌", "version": "1.20", "type": "方块",
@@ -3368,14 +3368,14 @@
       "tags": ["木材", "装饰"], "world": "无",
       "note": "绯红木做的悬挂告示牌，能挂在天花板上。",
       "aliases": [], "weight": 0.3,
-      "crafted_from": ["去皮菌柄", "锁链"], "crafts_into": []
+      "crafted_from": ["去皮绯红菌柄", "锁链"], "crafts_into": []
     },
     {
       "name": "悬挂式诡异木告示牌", "version": "1.20", "type": "方块",
       "tags": ["木材", "装饰"], "world": "无",
       "note": "诡异木做的悬挂告示牌，能挂在天花板上。",
       "aliases": [], "weight": 0.3,
-      "crafted_from": ["去皮菌柄", "锁链"], "crafts_into": []
+      "crafted_from": ["去皮诡异菌柄", "锁链"], "crafts_into": []
     },
     {
       "name": "圆石墙", "version": "1.8", "type": "方块",
@@ -3753,7 +3753,7 @@
       "tags": ["植物", "食物", "烹饪"], "world": "无",
       "note": "吃什么效果全看放的花。",
       "aliases": ["suspicious_stew"], "weight": 1,
-      "crafted_from": ["兰花", "凋灵玫瑰", "滨菊", "火把花", "眼眸花", "矢车菊", "碗", "绒球葱", "蒲公英", "蘑菇", "郁金香", "金蒲公英", "铃兰"], "crafts_into": []
+      "crafted_from": ["兰花", "凋灵玫瑰", "棕色蘑菇", "滨菊", "火把花", "眼眸花", "矢车菊", "碗", "红色蘑菇", "绒球葱", "蒲公英", "郁金香", "金蒲公英", "铃兰"], "crafts_into": []
     },
     {
       "name": "铃兰", "version": "1.14", "type": "方块",

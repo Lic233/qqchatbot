@@ -363,7 +363,7 @@ POST https://app.5eplay.com/api/csgo/tournament/csgo_event_list_v1
 | `弗一把 状态` / `榜单` / `结束` | 看进度 / 看完整榜 / 认输揭晓答案 |
 
 - 题目在 JSON 里，改题不用碰代码：简单 = `config/mc_guess_easy.json`（739 条，1.20.2 截止），
-  困难 = 简单 + `config/mc_guess_hard.json`（231 条，扩到 26.3），合计 970 条。
+  困难 = 简单 + `config/mc_guess_hard.json`（277 条，扩到 26.3），合计 1016 条。
   字段写错、版本 / 类型 / 标签不在词表、权值不是正数，启动或自检时会指出第几条。
 - 六维里的「加入版本」带更新主题名（`1.13 水域更新`、`26.1 小鬼当家`），名字写在两份 JSON 的 `version_names`。
 - 每道题有 `weight`，概率 = 本题权重 ÷ 全库权重和；楼梯 / 台阶 / 告示牌等同款设 0.3，其余为 1。
